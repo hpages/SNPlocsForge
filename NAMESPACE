@@ -1,0 +1,8 @@
+import(methods)
+importFrom(rjson, fromJSON)
+
+import(S4Vectors)
+import(GenomeInfoDb)
+
+export(extract_raw_snps_from_json)
+
