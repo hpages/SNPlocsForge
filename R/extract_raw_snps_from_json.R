@@ -139,6 +139,31 @@
       alleles$deleted_sequence, inserted_sequences)
 }
 
+### Vectorized!
+.has_suffix <- function(x, suffix)
+{
+    stopifnot(is.character(x))
+    stopifnot(isSingleString(suffix), !is.na(suffix))
+    nc <- nchar(x)
+    substr(x, nc - nchar(suffix) + 1L, nc) == suffix
+}
+
+.open_local_file <- function(filepath, open="rb")
+{
+    if (!isSingleString(filepath))
+        stop(wmsg("path to local file must be a single string"))
+    if (.has_suffix(filepath, ".gz")) {
+        con <- gzfile(filepath, open=open)
+    } else if (.has_suffix(filepath, ".bz2")) {
+        con <- bzfile(filepath, open=open)
+    } else if (.has_suffix(filepath, ".xz")) {
+        con <- xzfile(filepath, open=open)
+    } else {
+        con <- file(filepath, open=open)
+    }
+    con
+}
+
 ### Based on rjson::fromJSON().
 ### rjson::fromJSON() and jsonlite::parse_json() are both fast. However,
 ### there's a caveat with the latter: using 'simplifyVector=TRUE' makes it
@@ -162,12 +187,18 @@ extract_raw_snps_from_json <- function(con, out="", n=50000,
     if (!is.integer(n))
         n <- as.integer(n)
     if (is.character(con)) {
-        con <- file(con, "rb")
+        if (!isSingleString(con))
+            stop(wmsg("'con' must be a single string or a connection"))
+        con <- .open_local_file(con)
         on.exit(close(con))
     }
-    if (is.character(out) && out != "") {
-        out <- file(out, "w")
-        on.exit(close(out), add=TRUE)
+    if (is.character(out)) {
+        if (!isSingleString(out))
+            stop(wmsg("'out' must be a single string or a connection"))
+        if (out != "") {
+            out <- file(out, "w")
+            on.exit(close(out), add=TRUE)
+        }
     }
     chrominfo <- getChromInfoFromNCBI(assembly)
     lineno <- 1L
