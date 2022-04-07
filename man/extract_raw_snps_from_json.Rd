@@ -60,12 +60,19 @@ extract_raw_snps_from_json(con, out="", n=50000,
 }
 
 \note{
-  \code{extract_raw_snps_from_json()} is very slow! It takes about 12
-  seconds on refsnp-chrMT.json (7333 RefSNP ids), about 1 h 12 min on
-  refsnp-chrY.json (2480654 RefSNP ids), about 7 h on refsnp-chr22.json
-  (14305736 RefSNP ids), and about 29 h on refsnp-chr1.json (xxx RefSNP ids).
-  So all in all, that means about 14 days to process the RefSNP JSON files
-  for all Human chromosomes (25 files, xxx RefSNP ids).
+  \code{extract_raw_snps_from_json()} is very slow!
+
+  Here are some timings:
+  \itemize{
+    \item It takes about 12 seconds on refsnp-chrMT.json (7333 RefSNP ids).
+    \item It takes about 1 h 12 min on refsnp-chrY.json (2480654 RefSNP ids).
+    \item It takes about 7 h 42 min on refsnp-chr22.json (14305736 RefSNP ids).
+    \item It takes about 21 h on refsnp-chr10.json.bz2 (??? RefSNP ids).
+    \item It takes about 35 h on refsnp-chr1.json.bz2 (??? RefSNP ids).
+    \item So all in all, that means it takes about 16-17 days to process
+          the RefSNP JSON files for all Human chromosomes (25 files,
+          ??? RefSNP ids).
+  }
 }
 
 \examples{

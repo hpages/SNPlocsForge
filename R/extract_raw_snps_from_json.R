@@ -1,3 +1,7 @@
+### =========================================================================
+### extract_raw_snps_from_json()
+### -------------------------------------------------------------------------
+
 ### RefSNP JSON (partly) documented at:
 ###   https://github.com/USF-HII/snptk/wiki/dbSNPJson
 
@@ -17,7 +21,7 @@
     stopifnot(identical(colnames(df), .EXPECTED_SPDI_FIELDS))
     seq_id <- unique(df[ , "seq_id"])
     stopifnot(length(seq_id) == 1L)
-    position <- unique(df[ , "position"])
+    position <- unique(as.integer(df[ , "position"]))
     stopifnot(length(position) == 1L)
     deleted_sequence <- unique(df[ , "deleted_sequence"])
     stopifnot(length(deleted_sequence) == 1L)
@@ -87,6 +91,7 @@
     alleles[[1L]]
 }
 
+### Returns a 1x6 data frame.
 .extract_raw_snp <- function(snp, chrominfo, paranoid=FALSE)
 {
     if (!isTRUEorFALSE(paranoid))
@@ -135,8 +140,37 @@
     }
 
     inserted_sequences <- paste(alleles$inserted_sequences, collapse="/")
-    c(snp$refsnp_id, variant_type, seqname, alleles$position,
-      alleles$deleted_sequence, inserted_sequences)
+    data.frame(refsnp_id=snp$refsnp_id,
+               variant_type=variant_type,
+               seqname=seqname,
+               position=alleles$position,
+               deleted_sequence=alleles$deleted_sequence,
+               inserted_sequences=inserted_sequences)
+}
+
+### Returns a 6-col data frame with 1 row per JSON line.
+.extract_raw_snps_from_json_lines <- function(json_lines, chrominfo,
+                                              paranoid=FALSE)
+{
+    stopifnot(is.character(json_lines))
+    raw_snps <- lapply(json_lines,
+        function(json_line) {
+            ## rjson::fromJSON() and jsonlite::parse_json() are both fast.
+            ## Beware of a caveat with the latter: using 'simplifyVector=TRUE'
+            ## makes it very slow and do weird things!
+            ## Very slow: it makes jsonlite::parse_json() about 20x slower
+            ## on 'refsnp-chrMT.json'! This is because the simplification is
+            ## implemented in pure R (via jsonlite:::simplify()).
+            ## Weird things: when parsing a RefSNP JSON file (e.g.
+            ## 'refsnp-chrMT.json') the "present_obs_movements" field gets
+            ## transformed in a weird way that makes it hard to work with.
+            snp <- rjson::fromJSON(json_line)
+            raw_snp <- try(.extract_raw_snp(snp, chrominfo, paranoid=paranoid))
+            if (inherits(raw_snp, "try-error"))
+                stop(wmsg("Failed to extract raw snp from line ", json_line))
+            raw_snp
+        })
+    do.call(rbind, raw_snps)
 }
 
 ### Vectorized!
@@ -164,15 +198,6 @@
     con
 }
 
-### Based on rjson::fromJSON().
-### rjson::fromJSON() and jsonlite::parse_json() are both fast. However,
-### there's a caveat with the latter: using 'simplifyVector=TRUE' makes it
-### very slow and do weird things!
-### Very slow: it makes jsonlite::parse_json() about 20x slower
-### on 'refsnp-chrMT.json'! This is because the simplification is
-### implemented in pure R (via jsonlite:::simplify()).
-### Weird things: when parsing 'refsnp-chrMT.json' the "present_obs_movements"
-### field gets transformed in a weird way that makes it hard to work with.
 ### Using 'paranoid=TRUE' performs additional sanity checks on the extracted
 ### alleles but at the cost of a 50-60% slowdown!
 ### Typical use:
@@ -201,24 +226,35 @@ extract_raw_snps_from_json <- function(con, out="", n=50000,
         }
     }
     chrominfo <- getChromInfoFromNCBI(assembly)
-    lineno <- 1L
-    while (length(json_lines <- readLines(con, n=n)) != 0L) {
+    offset <- 0L
+    while (TRUE) {
+        if (n >= 1L)
+            cat("Reading lines (", n, " max) ... ", sep="")
+        json_lines <- readLines(con, n=n)
+        nline <- length(json_lines)
+        if (nline == 0L) {
+            if (n >= 1L)
+                cat("no more lines to read!\n")
+            break
+        }
         if (n >= 1L) {
-            to <- lineno + length(json_lines) - 1L
-            cat("processing lines ", lineno, "-", to, " ... ", sep="")
+            from <- offset + 1L
+            to <- offset + nline
+            cat("ok; processing lines ", from, "-", to, " ... ", sep="")
         }
-        for (json_line in json_lines) {
-            snp <- rjson::fromJSON(json_line)
-            raw_snp <- try(.extract_raw_snp(snp, chrominfo, paranoid=paranoid))
-            if (inherits(raw_snp, "try-error"))
-                stop(wmsg("Failed to extract raw snp from line ", json_line))
-            cat(paste(raw_snp, collapse="\t"), "\n", sep="", file=out)
-            lineno <- lineno + 1L
-        }
+        raw_snps <- .extract_raw_snps_from_json_lines(json_lines, chrominfo,
+                                                      paranoid=paranoid)
+        if (n >= 1L)
+            cat("ok; writing ", nrow(raw_snps), " raw snps ... ", sep="")
+        write.table(raw_snps, file=out, append=TRUE,
+                    quote=FALSE, sep="\t", row.names=FALSE, col.names=FALSE)
         if (n >= 1L)
             cat("ok\n")
+        offset <- offset + nline
+        if (n >= 1L && nline < n)
+            break
     }
     cat("DONE.\n")
-    invisible(lineno - 1L)
+    invisible(offset)
 }
 
