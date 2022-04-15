@@ -1,8 +1,16 @@
 import(methods)
+importFrom(utils, read.table, write.table)
 importFrom(rjson, fromJSON)
 
 import(S4Vectors)
+import(IRanges)
 import(GenomeInfoDb)
+import(Biostrings)
+import(BSgenome)
+import(GenomicRanges)
 
-export(extract_raw_snps_from_json)
+export(
+    extract_raw_snps_from_json,
+    build_OnDiskLongTable
+)
 
