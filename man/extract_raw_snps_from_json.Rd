@@ -46,7 +46,7 @@ extract_raw_snps_from_json(con, out="", n=50000,
     \item RefSNP id
     \item variant type
     \item sequence name
-    \item alleles position
+    \item alleles position (zero-based)
     \item deleted sequence
     \item inserted sequences
   }

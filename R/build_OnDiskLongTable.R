@@ -5,7 +5,7 @@
     COL2CLASS <- c(rsid="integer",
                    variant_type="character",
                    seqname="character",
-                   position="integer",
+                   pos0="integer",
                    deleted_sequence="character",
                    inserted_sequences="character")
     read.table(filepath, sep="\t", quote="", col.names=names(COL2CLASS),
@@ -27,7 +27,7 @@
 
 ### Return SNPs of type "snv" in a 3-col data.frame:
 ###   1. rsid: integer vector (RefSNP id without "rs" prefix)
-###   2. pos: integer vector (the input "position" col)
+###   2. pos: integer vector (one-based position)
 ###   3. alleles: raw vector (alleles as an IUPAC letter turned into
 ###      byte value).
 .cook_raw_snps <- function(raw_snps, expected_seqname)
@@ -47,11 +47,13 @@
     rsid <- raw_snps[ , "rsid"]
     stopifnot(is.integer(rsid))
 
+    pos <- raw_snps[ , "pos0"] + 1L
+
     alleles <- gsub("/", "", raw_snps[ , "inserted_sequences"], fixed=TRUE)
     alleles <- BSgenome:::encode_letters_as_bytes(mergeIUPACLetters(alleles))
 
     ans <- data.frame(rsid=rsid,
-                      pos=raw_snps[ , "position"],
+                      pos=pos,
                       alleles=alleles,
                       stringsAsFactors=FALSE)
     ans <- ans[order(ans[ , "pos"]), , drop=FALSE]
@@ -60,9 +62,10 @@
 }
 
 ### Believe it or not, but some SNPs in dbSNP are reported to be at a position
-### that is beyond the end of the chromosome. For example, rs553244808 is
-### reported to be at position 143544518 on chromosome 14 in GRCh38.p7, even
-### though the length of this chromosome is 107043718. We drop these SNPs.
+### that is beyond the end of the chromosome. For example, rs553244808 (from
+### dbSNP 151) was reported to be at position 143544518 on chromosome 14 in
+### GRCh38.p7, even though the length of this chromosome is 107043718. We
+### drop these SNPs.
 .drop_out_of_bounds_snps <- function(cooked_snps, seqlength)
 {
     pos <- cooked_snps[ , "pos"]
@@ -154,5 +157,6 @@ build_OnDiskLongTable <- function(tmp_dir, seqnames, chr_prefix="chr",
     cat("\n")
     cat("****************** END build_OnDiskLongTable() *******************\n")
     cat("Total number of SNPs written to disk: ", length(rowids), "\n", sep="")
+    cat("\n")
 }
 
