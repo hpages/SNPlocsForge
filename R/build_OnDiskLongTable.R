@@ -94,15 +94,17 @@
 }
 
 ### 'seqnames' must be a single string (e.g. "20 21 22")
-build_OnDiskLongTable <- function(tmp_dir, seqnames, chr_prefix="chr",
-                                  batchsize=200000L)
+build_OnDiskLongTable <- function(tmp_dir, seqnames, assembly="GRCh38.p13",
+                                  chr_prefix="chr", batchsize=200000L)
 {
+    stopifnot(isSingleString(assembly))
+
     cat("\n")
     cat("***************** START build_OnDiskLongTable() ******************\n")
 
     seqnames <- strsplit(seqnames, " ", fixed=TRUE)[[1L]]
 
-    seqinfo <- BSgenome:::read_seqinfo_table("seqinfo.txt", genome="GRCh38.p7")
+    seqinfo <- BSgenome:::read_seqinfo_table("seqinfo.txt", genome=assembly)
 
     rowids <- vector("list", length=length(seqnames))
     names(rowids) <- seqnames
