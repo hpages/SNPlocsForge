@@ -1,5 +1,5 @@
 ### =========================================================================
-### extract_raw_snps_from_json()
+### extract_raw_snps_from_RefSNP_json()
 ### -------------------------------------------------------------------------
 
 ### RefSNP JSON (partly) documented at:
@@ -198,19 +198,24 @@
     con
 }
 
+quick_show_RefSNP_json <- function(con)
+{
+}
+
 ### Using 'paranoid=TRUE' performs additional sanity checks on the extracted
 ### alleles but at the cost of a 50-60% slowdown!
 ### Typical use:
 ###   json_file <- "refsnp-chrMT.json"
 ###   out_file <- "chrMT_raw_snps.tab"
-###   extract_raw_snps_from_json(json_file, out_file, n=1000)
-extract_raw_snps_from_json <- function(con, out="", n=50000,
-                                       assembly="GRCh38.p13", paranoid=FALSE)
+###   extract_raw_snps_from_RefSNP_json(json_file, out_file, chunksize=1000)
+extract_raw_snps_from_RefSNP_json <- function(con, out="", chunksize=50000,
+                                              assembly="GRCh38.p13",
+                                              paranoid=FALSE)
 {
-    if (!isSingleNumber(n))
-        stop(wmsg("'n' must be a single integer"))
-    if (!is.integer(n))
-        n <- as.integer(n)
+    if (!isSingleNumber(chunksize))
+        stop(wmsg("'chunksize' must be a single integer"))
+    if (!is.integer(chunksize))
+        chunksize <- as.integer(chunksize)
     if (is.character(con)) {
         if (!isSingleString(con))
             stop(wmsg("'con' must be a single string or a connection"))
@@ -228,30 +233,30 @@ extract_raw_snps_from_json <- function(con, out="", n=50000,
     chrominfo <- getChromInfoFromNCBI(assembly)
     offset <- 0L
     while (TRUE) {
-        if (n >= 1L)
-            cat("Reading lines (", n, " max) ... ", sep="")
-        json_lines <- readLines(con, n=n)
+        if (chunksize >= 1L)
+            cat("Reading lines (", chunksize, " max) ... ", sep="")
+        json_lines <- readLines(con, n=chunksize)
         nline <- length(json_lines)
         if (nline == 0L) {
-            if (n >= 1L)
+            if (chunksize >= 1L)
                 cat("no more lines to read!\n")
             break
         }
-        if (n >= 1L) {
+        if (chunksize >= 1L) {
             from <- offset + 1L
             to <- offset + nline
             cat("ok; processing lines ", from, "-", to, " ... ", sep="")
         }
         raw_snps <- .extract_raw_snps_from_json_lines(json_lines, chrominfo,
                                                       paranoid=paranoid)
-        if (n >= 1L)
+        if (chunksize >= 1L)
             cat("ok; writing ", nrow(raw_snps), " raw snps ... ", sep="")
         write.table(raw_snps, file=out, append=TRUE,
                     quote=FALSE, sep="\t", row.names=FALSE, col.names=FALSE)
-        if (n >= 1L)
+        if (chunksize >= 1L)
             cat("ok\n")
         offset <- offset + nline
-        if (n >= 1L && nline < n)
+        if (chunksize >= 1L && nline < chunksize)
             break
     }
     cat("DONE.\n")

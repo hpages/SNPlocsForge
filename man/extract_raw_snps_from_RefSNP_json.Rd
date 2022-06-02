@@ -1,6 +1,6 @@
-\name{extract_raw_snps_from_json}
+\name{extract_raw_snps_from_RefSNP_json}
 
-\alias{extract_raw_snps_from_json}
+\alias{extract_raw_snps_from_RefSNP_json}
 
 \title{Extract "raw" SNPs from the JSON files provided by dbSNP}
 
@@ -10,8 +10,8 @@
 }
 
 \usage{
-extract_raw_snps_from_json(con, out="", n=50000,
-                           assembly="GRCh38.p13", paranoid=FALSE)
+extract_raw_snps_from_RefSNP_json(con, out="", chunksize=50000,
+                                  assembly="GRCh38.p13", paranoid=FALSE)
 }
 
 \arguments{
@@ -22,7 +22,7 @@ extract_raw_snps_from_json(con, out="", n=50000,
   \item{out}{
     Output file (will be written in tab-delimited format).
   }
-  \item{n}{
+  \item{chunksize}{
     How many JSON lines to load at once in memory. Set to -1 to load the
     entire file in memory (strongly discouraged on a big JSON file!)
   }
@@ -38,8 +38,8 @@ extract_raw_snps_from_json(con, out="", n=50000,
 
 \details{
   RefSNP JSON files have one RefSNP id per line.
-  \code{extract_raw_snps_from_json()} will write one line to the output file
-  (tab-delimited) for each line in the input file (RefSNP JSON).
+  \code{extract_raw_snps_from_RefSNP_json()} will write one line to the
+  output file (tab-delimited) per line in the input file (RefSNP JSON).
 
   Columns written to the tab-delimited file:
   \enumerate{
@@ -60,7 +60,7 @@ extract_raw_snps_from_json(con, out="", n=50000,
 }
 
 \note{
-  \code{extract_raw_snps_from_json()} is very slow!
+  \code{extract_raw_snps_from_RefSNP_json()} is very slow!
 
   Here are some timings:
   \itemize{
@@ -81,7 +81,7 @@ json_file <- system.file("extdata", "refsnp-chrMT.json",
 out_file <- tempfile(fileext=".tab")
 
 ## Should take about 15 sec.:
-extract_raw_snps_from_json(json_file, out_file, n=1000)
+extract_raw_snps_from_RefSNP_json(json_file, out_file, chunksize=1000)
 
 cat(head(readLines(out_file)), sep="\n")
 

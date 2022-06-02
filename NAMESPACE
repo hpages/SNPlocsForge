@@ -10,7 +10,7 @@ import(BSgenome)
 import(GenomicRanges)
 
 export(
-    extract_raw_snps_from_json,
+    extract_raw_snps_from_RefSNP_json,
     build_OnDiskLongTable
 )
 
