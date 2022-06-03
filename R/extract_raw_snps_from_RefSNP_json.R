@@ -73,28 +73,6 @@
          inserted_sequences=inserted_sequences)
 }
 
-### Returns NULL if 'movements' is empty.
-.extract_alleles_from_movements <- function(movements)
-{
-    stopifnot(is.list(movements))
-    if (length(movements) == 0L)
-        return(NULL)
-    spdi_records <- lapply(movements,
-        function(mov) {
-            stopifnot(is.list(mov))
-            expected_mov_fields <- c(
-                "component_ids", "observation", "allele_in_cur_release",
-                "other_rsids_in_cur_release", "previous_release",
-                "last_added_to_this_rs"
-            )
-            if (length(mov) == 5L)
-                expected_mov_fields <- expected_mov_fields[-5L]
-            stopifnot(identical(names(mov), expected_mov_fields))
-            .make_spdi_record(mov$allele_in_cur_release)
-        })
-    .collapse_spdi_records(spdi_records)
-}
-
 .extract_placement_alleles <- function(placement)
 {
     expected_fields <- c("seq_id", "is_ptlp", "placement_annot", "alleles")
@@ -114,29 +92,6 @@
             stopifnot(is.list(allele), identical(names(allele), "spdi"))
             .make_spdi_record(allele$spdi)
         })
-}
-
-### Returns NULL if not a preferred top level placement (PTLP).
-.extract_selected_alleles_from_placement <- function(placement)
-{
-    alleles <- .extract_placement_alleles(placement)
-    if (!placement$is_ptlp)
-        return(NULL)
-    spdi_records <- .extract_spdi_records_from_alleles(alleles)
-    selected_alleles <- .collapse_spdi_records(spdi_records)
-    stopifnot(identical(selected_alleles$seq_id, placement$seq_id))
-    selected_alleles
-}
-
-### Assumes that 'placements' contains exactly **one** preferred top level
-### placement (PTLP) and returns the alleles corresponding to that placement.
-.extract_alleles_from_placements <- function(placements)
-{
-    stopifnot(is.list(placements))
-    alleles <- lapply(placements, .extract_selected_alleles_from_placement)
-    alleles <- S4Vectors:::delete_NULLs(alleles)
-    stopifnot(length(alleles) == 1L)
-    alleles[[1L]]
 }
 
 .extract_primary_snapshot_data <- function(snp)
@@ -164,6 +119,20 @@
 ### quick_preview_RefSNP_json()
 ###
 
+### Returns a 1x5 data frame.
+.summarize_placement <- function(placement)
+{
+    alleles <- .extract_placement_alleles(placement)
+    spdi_records <- .extract_spdi_records_from_alleles(alleles)
+    alleles <- .collapse_spdi_records(spdi_records)
+    alleles$inserted_sequences <- paste(alleles$inserted_sequences,
+                                        collapse=",")
+    seq_type <- placement$placement_annot$seq_type
+    stopifnot(isSingleString(seq_type))
+    summarized_placement <- c(list(seq_type=seq_type), alleles)
+    as.data.frame(summarized_placement)
+}
+
 .summarize_snp <- function(snp)
 {
     data <- .extract_primary_snapshot_data(snp)
@@ -171,11 +140,12 @@
     stopifnot(isSingleString(variant_type))
 
     summarized_placements <- lapply(data$placements_with_allele,
-        function(placement) {
-            alleles <- .extract_placement_alleles(placement)
-            spdi_records <- .extract_spdi_records_from_alleles(alleles)
-            do.call(rbind, spdi_records)
-        })
+                                    .summarize_placement)
+
+    ## Turn 'summarized_placements' into a 5-col data frame with 1 row
+    ## per placement.
+    summarized_placements <- do.call(rbind, summarized_placements)
+
     list(refsnp_id=snp$refsnp_id,
          variant_type=variant_type,
          placements=summarized_placements)
@@ -212,6 +182,51 @@ quick_preview_RefSNP_json <- function(con, n=6)
 ### extract_raw_snps_from_RefSNP_json()
 ###
 
+### Returns NULL if not a preferred top level placement (PTLP).
+.extract_alleles_if_placement_is_ptlp <- function(placement)
+{
+    alleles <- .extract_placement_alleles(placement)
+    if (!placement$is_ptlp)
+        return(NULL)
+    spdi_records <- .extract_spdi_records_from_alleles(alleles)
+    ptlp_alleles <- .collapse_spdi_records(spdi_records)
+    stopifnot(identical(ptlp_alleles$seq_id, placement$seq_id))
+    ptlp_alleles
+}
+
+### Assumes that 'placements' contains exactly **one** preferred top level
+### placement (PTLP) and returns the alleles corresponding to that placement.
+.extract_ptlp_alleles <- function(placements)
+{
+    stopifnot(is.list(placements))
+    alleles <- lapply(placements, .extract_alleles_if_placement_is_ptlp)
+    alleles <- S4Vectors:::delete_NULLs(alleles)
+    stopifnot(length(alleles) == 1L)
+    alleles[[1L]]
+}
+
+### Returns NULL if 'movements' is empty.
+.extract_alleles_from_movements <- function(movements)
+{
+    stopifnot(is.list(movements))
+    if (length(movements) == 0L)
+        return(NULL)
+    spdi_records <- lapply(movements,
+        function(mov) {
+            stopifnot(is.list(mov))
+            expected_mov_fields <- c(
+                "component_ids", "observation", "allele_in_cur_release",
+                "other_rsids_in_cur_release", "previous_release",
+                "last_added_to_this_rs"
+            )
+            if (length(mov) == 5L)
+                expected_mov_fields <- expected_mov_fields[-5L]
+            stopifnot(identical(names(mov), expected_mov_fields))
+            .make_spdi_record(mov$allele_in_cur_release)
+        })
+    .collapse_spdi_records(spdi_records)
+}
+
 ### Returns a 1x6 data frame.
 .extract_raw_snp <- function(snp, chrominfo, paranoid=FALSE)
 {
@@ -223,24 +238,24 @@ quick_preview_RefSNP_json <- function(con, n=6)
     variant_type <- data$variant_type
     stopifnot(isSingleString(variant_type))
 
-    ## Extract alleles from "placements_with_allele".
-    alleles <- .extract_alleles_from_placements(data$placements_with_allele)
+    ## Extract alleles from the preferred top level placement (PTLP).
+    ptlp_alleles <- .extract_ptlp_alleles(data$placements_with_allele)
 
     if (paranoid) {
         ## Extract alleles from "present_obs_movements".
         alleles2 <- .extract_alleles_from_movements(snp$present_obs_movements)
         if (!is.null(alleles2)) {
-            stopifnot(identical(alleles$seq_id, alleles2$seq_id))
-            stopifnot(identical(alleles$position, alleles2$position))
-            stopifnot(identical(alleles$deleted_sequence,
-                                alleles2$deleted_sequence))
+            stopifnot(identical(ptlp_alleles$seq_id, alleles2$seq_id))
+            stopifnot(identical(ptlp_alleles$position, alleles2$position))
+            stopifnot(identical(ptlp_alleles$deleted_sequence,
+                                ptlp_alleles$deleted_sequence))
             stopifnot(all(alleles2$inserted_sequences %in%
-                          alleles$inserted_sequences))
+                          ptlp_alleles$inserted_sequences))
         }
     }
 
     ## Replace 'seq_id' with official sequence name from NCBI assembly.
-    seq_id <- alleles$seq_id
+    seq_id <- ptlp_alleles$seq_id
     m <- match(seq_id, chrominfo[ , "RefSeqAccn"])
     if (is.na(m)) {
         seqname <- seq_id
@@ -248,12 +263,12 @@ quick_preview_RefSNP_json <- function(con, n=6)
         seqname <- chrominfo[m , "SequenceName"]
     }
 
-    inserted_sequences <- paste(alleles$inserted_sequences, collapse="/")
+    inserted_sequences <- paste(ptlp_alleles$inserted_sequences, collapse=",")
     data.frame(refsnp_id=snp$refsnp_id,
                variant_type=variant_type,
                seqname=seqname,
-               position=alleles$position,
-               deleted_sequence=alleles$deleted_sequence,
+               position=ptlp_alleles$position,
+               deleted_sequence=ptlp_alleles$deleted_sequence,
                inserted_sequences=inserted_sequences)
 }
 
