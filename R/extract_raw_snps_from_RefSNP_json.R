@@ -150,6 +150,8 @@
     as.data.frame(summarized_placement)
 }
 
+### Returns a 3-component list or a NULL (if the SNP type is not one
+### of the types specified via 'variant_type').
 .summarize_snp <- function(snp, variant_type=NULL, seq_type=NULL)
 {
     data <- .extract_primary_snapshot_data(snp)
@@ -181,21 +183,9 @@
          placements=summarized_placements)
 }
 
-### Returns a named list with 1 list element per SNP.
-quick_preview_RefSNP_json <- function(con, n=6,
-                                      variant_type=NULL, seq_type=NULL)
+.extract_summarized_snps_from_json_lines <-
+    function(json_lines, variant_type=NULL, seq_type=NULL)
 {
-    if (!(is.null(variant_type) || is.character(variant_type)))
-        stop(wmsg("'variant_type' must be NULL or a character vector"))
-    if (!(is.null(seq_type) || is.character(seq_type)))
-        stop(wmsg("'seq_type' must be NULL or a character vector"))
-    if (is.character(con)) {
-        if (!isSingleString(con))
-            stop(wmsg("'con' must be a single string or a connection"))
-        con <- .open_local_file(con)
-        on.exit(close(con))
-    }
-    json_lines <- readLines(con, n=n)
     lapply(json_lines,
         function(json_line) {
             ## rjson::fromJSON() and jsonlite::parse_json() are both fast.
@@ -210,6 +200,111 @@ quick_preview_RefSNP_json <- function(con, n=6,
             snp <- rjson::fromJSON(json_line)
             .summarize_snp(snp, variant_type=variant_type, seq_type=seq_type)
         })
+}
+
+### Returns a named list with 1 list element per SNP.
+quick_preview_RefSNP_json <-
+    function(con, variant_type=NULL, seq_type=NULL, n=6)
+{
+    if (is.character(con)) {
+        if (!isSingleString(con))
+            stop(wmsg("'con' must be a single string or a connection"))
+        con <- .open_local_file(con)
+        on.exit(close(con))
+    }
+    if (!(is.null(variant_type) || is.character(variant_type)))
+        stop(wmsg("'variant_type' must be NULL or a character vector"))
+    if (!(is.null(seq_type) || is.character(seq_type)))
+        stop(wmsg("'seq_type' must be NULL or a character vector"))
+    json_lines <- readLines(con, n=n)
+    .extract_summarized_snps_from_json_lines(json_lines,
+            variant_type=variant_type, seq_type=seq_type)
+}
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### extract_snvs_from_RefSNP_json()
+###
+
+.from_summarized_snv_to_df <- function(summarized_snv)
+{
+    if (is.null(summarized_snv))
+        return(NULL)
+    placements <- summarized_snv$placements
+    stopifnot(is.data.frame(placements))
+    keep_columns <- c("seq_id", "position",
+                      "deleted_sequence", "inserted_sequences")
+    placements <- cbind(refsnp_id=summarized_snv$refsnp_id,
+                        placements[ , keep_columns, drop=FALSE])
+}
+
+.summarize_snvs_per_seq_id <- function(json_lines)
+{
+    summarized_snvs <- .extract_summarized_snps_from_json_lines(json_lines,
+                                variant_type="snv",
+                                seq_type="refseq_chromosome")
+    dfs <- lapply(summarized_snvs, .from_summarized_snv_to_df)
+    DF <- as(do.call(rbind, dfs), "DataFrame")
+    j <- match("seq_id", colnames(DF))
+    stopifnot(!is.na(j))
+    f <- DF[ , j]
+    split(DF[ , -j, drop=FALSE], f)
+}
+
+.dump_snvs_per_seq_id <- function(snvs_per_seq_id, dump_dir, outfile)
+{
+    stopifnot(is(snvs_per_seq_id, "SplitDataFrameList"))
+    cat("seq ids:", names(snvs_per_seq_id), "\n")
+}
+
+extract_snvs_from_RefSNP_json <- function(con, dump_dir, chunksize=50000)
+{
+    if (!isSingleNumber(chunksize))
+        stop(wmsg("'chunksize' must be a single integer"))
+    if (!is.integer(chunksize))
+        chunksize <- as.integer(chunksize)
+    if (is.character(con)) {
+        if (!isSingleString(con))
+            stop(wmsg("'con' must be a single string or a connection"))
+        con <- .open_local_file(con)
+        on.exit(close(con))
+    }
+    if (!isSingleString(dump_dir))
+        stop(wmsg("'dump_dir' must be a single string specifying the path ",
+                  "to the directory where to dump the snvs"))
+    if (!dir.exists(dump_dir))
+        stop(wmsg("'dump_dir' must be the path to an existing directory"))
+    outfile <- basename(summary(con)$description)
+
+    offset <- 0L
+    while (TRUE) {
+        if (chunksize >= 1L)
+            cat("Reading lines (", chunksize, " max) ... ", sep="")
+        json_lines <- readLines(con, n=chunksize)
+        nline <- length(json_lines)
+        if (nline == 0L) {
+            if (chunksize >= 1L)
+                cat("no more lines to read!\n")
+            break
+        }
+        if (chunksize >= 1L) {
+            from <- offset + 1L
+            to <- offset + nline
+            cat("ok; processing lines ", from, "-", to, " ... ", sep="")
+        }
+        snvs_per_seq_id <- .summarize_snvs_per_seq_id(json_lines)
+        if (chunksize >= 1L)
+            cat("ok; dumping the extracted snvs to '", dump_dir, "' ... ",
+                sep="")
+        .dump_snvs_per_seq_id(snvs_per_seq_id, dump_dir, outfile)
+        if (chunksize >= 1L)
+            cat("ok\n")
+        offset <- offset + nline
+        if (chunksize >= 1L && nline < chunksize)
+            break
+    }
+    cat("DONE.\n")
+    invisible(offset)
 }
 
 
