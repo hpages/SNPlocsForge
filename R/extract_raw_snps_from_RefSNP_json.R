@@ -84,6 +84,8 @@
     seq_id <- unique(df[ , "seq_id"])
     stopifnot(length(seq_id) == 1L)
     position <- unique(as.integer(df[ , "position"]))
+    if (length(position) != 1L)
+        print(spdi_records)
     stopifnot(length(position) == 1L)
     deleted_sequence <- unique(df[ , "deleted_sequence"])
     if (length(deleted_sequence) != 1L)
@@ -148,11 +150,13 @@
     as.data.frame(summarized_placement)
 }
 
-.summarize_snp <- function(snp, seq_type=NULL)
+.summarize_snp <- function(snp, variant_type=NULL, seq_type=NULL)
 {
     data <- .extract_primary_snapshot_data(snp)
-    variant_type <- data$variant_type
-    stopifnot(isSingleString(variant_type))
+    variant_type0 <- data$variant_type
+    stopifnot(isSingleString(variant_type0))
+    if (!(variant_type0 %in% variant_type))
+        return(NULL)
 
     summarized_placements <- lapply(data$placements_with_allele,
         function(placement) {
@@ -173,13 +177,16 @@
     }
 
     list(refsnp_id=snp$refsnp_id,
-         variant_type=variant_type,
+         variant_type=variant_type0,
          placements=summarized_placements)
 }
 
 ### Returns a named list with 1 list element per SNP.
-quick_preview_RefSNP_json <- function(con, n=6, seq_type=NULL)
+quick_preview_RefSNP_json <- function(con, n=6,
+                                      variant_type=NULL, seq_type=NULL)
 {
+    if (!(is.null(variant_type) || is.character(variant_type)))
+        stop(wmsg("'variant_type' must be NULL or a character vector"))
     if (!(is.null(seq_type) || is.character(seq_type)))
         stop(wmsg("'seq_type' must be NULL or a character vector"))
     if (is.character(con)) {
@@ -201,7 +208,7 @@ quick_preview_RefSNP_json <- function(con, n=6, seq_type=NULL)
             ## 'refsnp-chrMT.json') the "present_obs_movements" field gets
             ## transformed in a weird way that makes it hard to work with.
             snp <- rjson::fromJSON(json_line)
-            .summarize_snp(snp, seq_type=seq_type)
+            .summarize_snp(snp, variant_type=variant_type, seq_type=seq_type)
         })
 }
 
