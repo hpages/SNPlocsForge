@@ -54,8 +54,28 @@
     as.data.frame(spdi)
 }
 
-### 'spdi_records' must be a list of 1x4 data frames.
-### Returns a 4-component **list** (NOT data.frame).
+### Returns a list of 1x4 data frames.
+.extract_spdi_records_from_alleles <- function(alleles)
+{
+    spdi_records <- lapply(alleles,
+        function(allele) {
+            stopifnot(is.list(allele),
+                      identical(names(allele), c("allele", "hgvs")))
+            allele <- allele$allele
+            stopifnot(is.list(allele))
+            spdi <- allele$spdi
+            if (is.null(spdi))
+                return(NULL)
+            .make_spdi_record(spdi)
+        })
+    spdi_records <- S4Vectors:::delete_NULLs(spdi_records)
+    stopifnot(length(spdi_records) != 0L)
+    spdi_records
+}
+
+### 'spdi_records' must be a list of 1x4 data frames as returned
+### by .extract_spdi_records_from_alleles() above.
+### Returns a 4-component **list** (NOT a data.frame).
 .collapse_spdi_records <- function(spdi_records)
 {
     stopifnot(is.list(spdi_records))
@@ -66,32 +86,27 @@
     position <- unique(as.integer(df[ , "position"]))
     stopifnot(length(position) == 1L)
     deleted_sequence <- unique(df[ , "deleted_sequence"])
+    if (length(deleted_sequence) != 1L)
+        print(spdi_records)
     stopifnot(length(deleted_sequence) == 1L)
     inserted_sequences <- unique(df[ , "inserted_sequence"])
-    list(seq_id=seq_id, position=position,
+    list(seq_id=seq_id,
+         position=position,
          deleted_sequence=deleted_sequence,
          inserted_sequences=inserted_sequences)
 }
 
-.extract_placement_alleles <- function(placement)
+.check_placement <- function(placement)
 {
     expected_fields <- c("seq_id", "is_ptlp", "placement_annot", "alleles")
     stopifnot(is.list(placement), identical(names(placement), expected_fields))
+}
+
+.extract_placement_alleles <- function(placement)
+{
     alleles <- placement$alleles
     stopifnot(is.list(alleles))
     alleles
-}
-
-.extract_spdi_records_from_alleles <- function(alleles)
-{
-    lapply(alleles,
-        function(allele) {
-            stopifnot(is.list(allele),
-                      identical(names(allele), c("allele", "hgvs")))
-            allele <- allele$allele
-            stopifnot(is.list(allele), identical(names(allele), "spdi"))
-            .make_spdi_record(allele$spdi)
-        })
 }
 
 .extract_primary_snapshot_data <- function(snp)
@@ -123,28 +138,39 @@
 .summarize_placement <- function(placement)
 {
     alleles <- .extract_placement_alleles(placement)
+    seq_type <- placement$placement_annot$seq_type
+    stopifnot(isSingleString(seq_type))
     spdi_records <- .extract_spdi_records_from_alleles(alleles)
     alleles <- .collapse_spdi_records(spdi_records)
     alleles$inserted_sequences <- paste(alleles$inserted_sequences,
                                         collapse=",")
-    seq_type <- placement$placement_annot$seq_type
-    stopifnot(isSingleString(seq_type))
     summarized_placement <- c(list(seq_type=seq_type), alleles)
     as.data.frame(summarized_placement)
 }
 
-.summarize_snp <- function(snp)
+.summarize_snp <- function(snp, seq_type=NULL)
 {
     data <- .extract_primary_snapshot_data(snp)
     variant_type <- data$variant_type
     stopifnot(isSingleString(variant_type))
 
     summarized_placements <- lapply(data$placements_with_allele,
-                                    .summarize_placement)
+        function(placement) {
+            .check_placement(placement)
+            if (!is.null(seq_type)) {
+                seq_type0 <- placement$placement_annot$seq_type
+                if (!(seq_type0 %in% seq_type))
+                    return(NULL)
+            }
+            .summarize_placement(placement)
+        })
+    summarized_placements <- S4Vectors:::delete_NULLs(summarized_placements)
 
-    ## Turn 'summarized_placements' into a 5-col data frame with 1 row
-    ## per placement.
-    summarized_placements <- do.call(rbind, summarized_placements)
+    if (length(summarized_placements) != 0L) {
+        ## Turn 'summarized_placements' into a 5-col data frame with 1 row
+        ## per placement.
+        summarized_placements <- do.call(rbind, summarized_placements)
+    }
 
     list(refsnp_id=snp$refsnp_id,
          variant_type=variant_type,
@@ -152,8 +178,10 @@
 }
 
 ### Returns a named list with 1 list element per SNP.
-quick_preview_RefSNP_json <- function(con, n=6)
+quick_preview_RefSNP_json <- function(con, n=6, seq_type=NULL)
 {
+    if (!(is.null(seq_type) || is.character(seq_type)))
+        stop(wmsg("'seq_type' must be NULL or a character vector"))
     if (is.character(con)) {
         if (!isSingleString(con))
             stop(wmsg("'con' must be a single string or a connection"))
@@ -173,7 +201,7 @@ quick_preview_RefSNP_json <- function(con, n=6)
             ## 'refsnp-chrMT.json') the "present_obs_movements" field gets
             ## transformed in a weird way that makes it hard to work with.
             snp <- rjson::fromJSON(json_line)
-            .summarize_snp(snp)
+            .summarize_snp(snp, seq_type=seq_type)
         })
 }
 
@@ -185,9 +213,10 @@ quick_preview_RefSNP_json <- function(con, n=6)
 ### Returns NULL if not a preferred top level placement (PTLP).
 .extract_alleles_if_placement_is_ptlp <- function(placement)
 {
-    alleles <- .extract_placement_alleles(placement)
+    .check_placement(placement)
     if (!placement$is_ptlp)
         return(NULL)
+    alleles <- .extract_placement_alleles(placement)
     spdi_records <- .extract_spdi_records_from_alleles(alleles)
     ptlp_alleles <- .collapse_spdi_records(spdi_records)
     stopifnot(identical(ptlp_alleles$seq_id, placement$seq_id))
