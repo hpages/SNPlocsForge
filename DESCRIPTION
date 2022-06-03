@@ -11,4 +11,4 @@ Author: Hervé Pagès
 Maintainer: Hervé Pagès <hpages.on.github@gmail.com>
 Depends: methods, S4Vectors, IRanges, GenomeInfoDb, Biostrings, BSgenome,
 	GenomicRanges
-Imports: utils, rjson
+Imports: utils, stats, rjson

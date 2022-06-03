@@ -1,5 +1,6 @@
 import(methods)
 importFrom(utils, read.table, write.table)
+importFrom(stats, setNames)
 importFrom(rjson, fromJSON)
 
 import(S4Vectors)
@@ -10,6 +11,7 @@ import(BSgenome)
 import(GenomicRanges)
 
 export(
+    quick_preview_RefSNP_json,
     extract_raw_snps_from_RefSNP_json,
     build_OnDiskLongTable
 )

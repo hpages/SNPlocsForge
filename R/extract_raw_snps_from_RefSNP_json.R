@@ -2,8 +2,43 @@
 ### extract_raw_snps_from_RefSNP_json()
 ### -------------------------------------------------------------------------
 
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Open a compress file
+###
+
+### Vectorized!
+.has_suffix <- function(x, suffix)
+{
+    stopifnot(is.character(x))
+    stopifnot(isSingleString(suffix), !is.na(suffix))
+    nc <- nchar(x)
+    substr(x, nc - nchar(suffix) + 1L, nc) == suffix
+}
+
+.open_local_file <- function(filepath, open="rb")
+{
+    if (!isSingleString(filepath))
+        stop(wmsg("path to local file must be a single string"))
+    if (.has_suffix(filepath, ".gz")) {
+        con <- gzfile(filepath, open=open)
+    } else if (.has_suffix(filepath, ".bz2")) {
+        con <- bzfile(filepath, open=open)
+    } else if (.has_suffix(filepath, ".xz")) {
+        con <- xzfile(filepath, open=open)
+    } else {
+        con <- file(filepath, open=open)
+    }
+    con
+}
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### Low-level helpers for parsing a RefSNP JSON files
+###
 ### RefSNP JSON (partly) documented at:
 ###   https://github.com/USF-HII/snptk/wiki/dbSNPJson
+###
 
 .EXPECTED_SPDI_FIELDS <- c(
     "seq_id",
@@ -11,6 +46,13 @@
     "deleted_sequence",
     "inserted_sequence"
 )
+
+### Returns a 1x4 data frame.
+.make_spdi_record <- function(spdi)
+{
+    stopifnot(is.list(spdi), identical(names(spdi), .EXPECTED_SPDI_FIELDS))
+    as.data.frame(spdi)
+}
 
 ### 'spdi_records' must be a list of 1x4 data frames.
 ### Returns a 4-component **list** (NOT data.frame).
@@ -48,36 +90,42 @@
             if (length(mov) == 5L)
                 expected_mov_fields <- expected_mov_fields[-5L]
             stopifnot(identical(names(mov), expected_mov_fields))
-            spdi <- mov$allele_in_cur_release
-            stopifnot(is.list(spdi),
-                      identical(names(spdi), .EXPECTED_SPDI_FIELDS))
-            as.data.frame(spdi)
+            .make_spdi_record(mov$allele_in_cur_release)
         })
     .collapse_spdi_records(spdi_records)
 }
 
-### Returns NULL if not a preferred top level placement (PTLP).
-.extract_alleles_from_placement <- function(placement)
+.extract_placement_alleles <- function(placement)
 {
     expected_fields <- c("seq_id", "is_ptlp", "placement_annot", "alleles")
     stopifnot(is.list(placement), identical(names(placement), expected_fields))
-    if (!placement$is_ptlp)
-        return(NULL)
-    stopifnot(is.list(placement$alleles))
-    spdi_records <- lapply(placement$alleles,
+    alleles <- placement$alleles
+    stopifnot(is.list(alleles))
+    alleles
+}
+
+.extract_spdi_records_from_alleles <- function(alleles)
+{
+    lapply(alleles,
         function(allele) {
             stopifnot(is.list(allele),
                       identical(names(allele), c("allele", "hgvs")))
             allele <- allele$allele
             stopifnot(is.list(allele), identical(names(allele), "spdi"))
-            spdi <- allele$spdi
-            stopifnot(is.list(spdi),
-                      identical(names(spdi), .EXPECTED_SPDI_FIELDS))
-            as.data.frame(spdi)
+            .make_spdi_record(allele$spdi)
         })
-    alleles <- .collapse_spdi_records(spdi_records)
-    stopifnot(identical(alleles$seq_id, placement$seq_id))
-    alleles
+}
+
+### Returns NULL if not a preferred top level placement (PTLP).
+.extract_selected_alleles_from_placement <- function(placement)
+{
+    alleles <- .extract_placement_alleles(placement)
+    if (!placement$is_ptlp)
+        return(NULL)
+    spdi_records <- .extract_spdi_records_from_alleles(alleles)
+    selected_alleles <- .collapse_spdi_records(spdi_records)
+    stopifnot(identical(selected_alleles$seq_id, placement$seq_id))
+    selected_alleles
 }
 
 ### Assumes that 'placements' contains exactly **one** preferred top level
@@ -85,18 +133,14 @@
 .extract_alleles_from_placements <- function(placements)
 {
     stopifnot(is.list(placements))
-    alleles <- lapply(placements, .extract_alleles_from_placement)
+    alleles <- lapply(placements, .extract_selected_alleles_from_placement)
     alleles <- S4Vectors:::delete_NULLs(alleles)
     stopifnot(length(alleles) == 1L)
     alleles[[1L]]
 }
 
-### Returns a 1x6 data frame.
-.extract_raw_snp <- function(snp, chrominfo, paranoid=FALSE)
+.extract_primary_snapshot_data <- function(snp)
 {
-    if (!isTRUEorFALSE(paranoid))
-        stop(wmsg("'paranoid' must be TRUE or FALSE"))
-    stopifnot(is.data.frame(chrominfo))
     EXPECTED_TOP_FIELDS <- c(
         "refsnp_id", "create_date", "last_update_date", "last_update_build_id",
         "dbsnp1_merges", "citations", "lost_obs_movements",
@@ -111,6 +155,71 @@
         "variant_type", "ga4gh"
     )
     stopifnot(is.list(data), identical(names(data), EXPECTED_DATA_FIELDS))
+
+    data
+}
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### quick_preview_RefSNP_json()
+###
+
+.summarize_snp <- function(snp)
+{
+    data <- .extract_primary_snapshot_data(snp)
+    variant_type <- data$variant_type
+    stopifnot(isSingleString(variant_type))
+
+    summarized_placements <- lapply(data$placements_with_allele,
+        function(placement) {
+            alleles <- .extract_placement_alleles(placement)
+            spdi_records <- .extract_spdi_records_from_alleles(alleles)
+            do.call(rbind, spdi_records)
+        })
+    list(refsnp_id=snp$refsnp_id,
+         variant_type=variant_type,
+         placements=summarized_placements)
+}
+
+### Returns a named list with 1 list element per SNP.
+quick_preview_RefSNP_json <- function(con, n=6)
+{
+    if (is.character(con)) {
+        if (!isSingleString(con))
+            stop(wmsg("'con' must be a single string or a connection"))
+        con <- .open_local_file(con)
+        on.exit(close(con))
+    }
+    json_lines <- readLines(con, n=n)
+    lapply(json_lines,
+        function(json_line) {
+            ## rjson::fromJSON() and jsonlite::parse_json() are both fast.
+            ## Beware of a caveat with the latter: using 'simplifyVector=TRUE'
+            ## makes it very slow and do weird things!
+            ## Very slow: it makes jsonlite::parse_json() about 20x slower
+            ## on 'refsnp-chrMT.json'! This is because the simplification is
+            ## implemented in pure R (via jsonlite:::simplify()).
+            ## Weird things: when parsing a RefSNP JSON file (e.g.
+            ## 'refsnp-chrMT.json') the "present_obs_movements" field gets
+            ## transformed in a weird way that makes it hard to work with.
+            snp <- rjson::fromJSON(json_line)
+            .summarize_snp(snp)
+        })
+}
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### extract_raw_snps_from_RefSNP_json()
+###
+
+### Returns a 1x6 data frame.
+.extract_raw_snp <- function(snp, chrominfo, paranoid=FALSE)
+{
+    if (!isTRUEorFALSE(paranoid))
+        stop(wmsg("'paranoid' must be TRUE or FALSE"))
+    stopifnot(is.data.frame(chrominfo))
+
+    data <- .extract_primary_snapshot_data(snp)
     variant_type <- data$variant_type
     stopifnot(isSingleString(variant_type))
 
@@ -171,35 +280,6 @@
             raw_snp
         })
     do.call(rbind, raw_snps)
-}
-
-### Vectorized!
-.has_suffix <- function(x, suffix)
-{
-    stopifnot(is.character(x))
-    stopifnot(isSingleString(suffix), !is.na(suffix))
-    nc <- nchar(x)
-    substr(x, nc - nchar(suffix) + 1L, nc) == suffix
-}
-
-.open_local_file <- function(filepath, open="rb")
-{
-    if (!isSingleString(filepath))
-        stop(wmsg("path to local file must be a single string"))
-    if (.has_suffix(filepath, ".gz")) {
-        con <- gzfile(filepath, open=open)
-    } else if (.has_suffix(filepath, ".bz2")) {
-        con <- bzfile(filepath, open=open)
-    } else if (.has_suffix(filepath, ".xz")) {
-        con <- xzfile(filepath, open=open)
-    } else {
-        con <- file(filepath, open=open)
-    }
-    con
-}
-
-quick_show_RefSNP_json <- function(con)
-{
 }
 
 ### Using 'paranoid=TRUE' performs additional sanity checks on the extracted
