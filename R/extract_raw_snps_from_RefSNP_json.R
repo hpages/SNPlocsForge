@@ -228,16 +228,17 @@ quick_preview_RefSNP_json <-
 ### extract_and_dispatch_snvs_from_RefSNP_json()
 ###
 
+### Returns a 6-col data frame.
 .from_summarized_snv_to_df <- function(summarized_snv)
 {
     if (is.null(summarized_snv))
         return(NULL)
     placements <- summarized_snv$placements
     stopifnot(is.data.frame(placements))
-    keep_columns <- c("seq_id", "position",
+    keep_columns <- c("is_ptlp", "seq_id", "position",
                       "deleted_sequence", "inserted_sequences")
-    placements <- cbind(refsnp_id=summarized_snv$refsnp_id,
-                        placements[ , keep_columns, drop=FALSE])
+    cbind(refsnp_id=summarized_snv$refsnp_id,
+          placements[ , keep_columns, drop=FALSE])
 }
 
 .summarize_snvs_per_seq_id <- function(json_lines)
