@@ -136,9 +136,11 @@
 ### quick_preview_RefSNP_json()
 ###
 
-### Returns a 1x5 data frame.
+### Returns a 1x6 data frame.
 .summarize_placement <- function(placement)
 {
+    is_ptlp <- placement$is_ptlp
+    stopifnot(isTRUEorFALSE(is_ptlp))
     alleles <- .extract_placement_alleles(placement)
     seq_type <- placement$placement_annot$seq_type
     stopifnot(isSingleString(seq_type))
@@ -146,7 +148,7 @@
     alleles <- .collapse_spdi_records(spdi_records)
     alleles$inserted_sequences <- paste(alleles$inserted_sequences,
                                         collapse=",")
-    summarized_placement <- c(list(seq_type=seq_type), alleles)
+    summarized_placement <- c(list(is_ptlp=is_ptlp, seq_type=seq_type), alleles)
     as.data.frame(summarized_placement)
 }
 
@@ -157,7 +159,7 @@
     data <- .extract_primary_snapshot_data(snp)
     variant_type0 <- data$variant_type
     stopifnot(isSingleString(variant_type0))
-    if (!(variant_type0 %in% variant_type))
+    if (!(is.null(variant_type) || variant_type0 %in% variant_type))
         return(NULL)
 
     summarized_placements <- lapply(data$placements_with_allele,
@@ -223,7 +225,7 @@ quick_preview_RefSNP_json <-
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### extract_snvs_from_RefSNP_json()
+### extract_and_dispatch_snvs_from_RefSNP_json()
 ###
 
 .from_summarized_snv_to_df <- function(summarized_snv)
