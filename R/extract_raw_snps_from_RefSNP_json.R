@@ -320,6 +320,8 @@ extract_and_dispatch_snvs_from_RefSNP_json <-
         if (chunksize >= 1L)
             cat("ok\n")
         .dump_snvs_per_seq_id(snvs_per_seq_id, dump_dir, outfile)
+        if (chunksize >= 1L)
+            cat("\n")
         offset <- offset + nline
         if (chunksize >= 1L && nline < chunksize)
             break
