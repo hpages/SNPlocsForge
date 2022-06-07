@@ -254,10 +254,29 @@ quick_preview_RefSNP_json <-
 .dump_snvs_per_seq_id <- function(snvs_per_seq_id, dump_dir, outfile)
 {
     stopifnot(is(snvs_per_seq_id, "SplitDataFrameList"))
-    cat("seq ids:", names(snvs_per_seq_id), "\n")
+    for (i in seq_along(snvs_per_seq_id)) {
+        seq_id <- names(snvs_per_seq_id)[[i]]
+        seq_dir <- file.path(dump_dir, seq_id)
+        if (!dir.exists(seq_dir)) {
+            cat("  - creating directory ", seq_dir, " ... ", sep="")
+            ok <- dir.create(seq_dir)
+            if (!ok)
+                stop(wmsg("FAILED to create directory"))
+            cat("ok\n")
+        }
+        out_path <- file.path(seq_dir, outfile)
+        summarized_snvs <- as.data.frame(snvs_per_seq_id[[i]])
+        cat("  - writing ", nrow(summarized_snvs),
+            " snvs to ", out_path, "... ", sep="")
+        write.table(summarized_snvs, file=out_path, append=TRUE,
+                    quote=FALSE, sep="\t", row.names=FALSE, col.names=FALSE)
+        cat("ok\n")
+    }
+    lengths(snvs_per_seq_id)
 }
 
-extract_snvs_from_RefSNP_json <- function(con, dump_dir, chunksize=50000)
+extract_and_dispatch_snvs_from_RefSNP_json <-
+    function(con, dump_dir, chunksize=50000)
 {
     if (!isSingleNumber(chunksize))
         stop(wmsg("'chunksize' must be a single integer"))
@@ -275,6 +294,11 @@ extract_snvs_from_RefSNP_json <- function(con, dump_dir, chunksize=50000)
     if (!dir.exists(dump_dir))
         stop(wmsg("'dump_dir' must be the path to an existing directory"))
     outfile <- basename(summary(con)$description)
+    if (.has_suffix(outfile, ".bz2"))
+        outfile <- substr(outfile, 1L, nchar(outfile) - nchar(".bz2"))
+    if (.has_suffix(outfile, ".json"))
+        outfile <- substr(outfile, 1L, nchar(outfile) - nchar(".json"))
+    outfile <- paste0(outfile, ".tab")
 
     offset <- 0L
     while (TRUE) {
@@ -294,11 +318,8 @@ extract_snvs_from_RefSNP_json <- function(con, dump_dir, chunksize=50000)
         }
         snvs_per_seq_id <- .summarize_snvs_per_seq_id(json_lines)
         if (chunksize >= 1L)
-            cat("ok; dumping the extracted snvs to '", dump_dir, "' ... ",
-                sep="")
-        .dump_snvs_per_seq_id(snvs_per_seq_id, dump_dir, outfile)
-        if (chunksize >= 1L)
             cat("ok\n")
+        .dump_snvs_per_seq_id(snvs_per_seq_id, dump_dir, outfile)
         offset <- offset + nline
         if (chunksize >= 1L && nline < chunksize)
             break
