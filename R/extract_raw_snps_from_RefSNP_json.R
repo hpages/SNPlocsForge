@@ -280,23 +280,28 @@ quick_preview_RefSNP_json <-
 }
 
 extract_snvs_from_RefSNP_json <- function(con, dump_dir,
-                                          chunksize=50000, BPPARAM=NULL)
+                                          chunksize=10000, BPPARAM=NULL)
 {
-    if (!isSingleNumber(chunksize))
-        stop(wmsg("'chunksize' must be a single integer"))
-    if (!is.integer(chunksize))
-        chunksize <- as.integer(chunksize)
     if (is.character(con)) {
         if (!isSingleString(con))
             stop(wmsg("'con' must be a single string or a connection"))
         con <- .open_local_file(con)
         on.exit(close(con))
     }
+
     if (!isSingleString(dump_dir))
         stop(wmsg("'dump_dir' must be a single string specifying the path ",
                   "to the directory where to dump the snvs"))
     if (!dir.exists(dump_dir))
         stop(wmsg("'dump_dir' must be the path to an existing directory"))
+
+    if (!isSingleNumber(chunksize))
+        stop(wmsg("'chunksize' must be a single integer"))
+    if (!is.integer(chunksize))
+        chunksize <- as.integer(chunksize)
+
+    if (!(is.null(BPPARAM) || is(BPPARAM, "BiocParallelParam")))
+        stop(wmsg("'BPPARAM' must be NULL or a BiocParallelParam object"))
 
     offset <- 0L
     while (TRUE) {
@@ -312,12 +317,20 @@ extract_snvs_from_RefSNP_json <- function(con, dump_dir,
         if (chunksize >= 1L) {
             from <- offset + 1L
             to <- offset + nline
-            cat("ok; processing lines ", from, "-", to, " ... ", sep="")
+            if (is.null(BPPARAM)) {
+                workers <- ""
+            } else {
+                workers <- paste0(" (using ", bpnworkers(BPPARAM), " workers)")
+            }
+            cat("ok; processing lines ", from, "-", to,
+                workers, " ... ", sep="")
         }
-        summarized_snvs <- .json_apply(json_lines, .summarize_snv,
-                                       BPPARAM=BPPARAM)
+        st <- system.time(
+            summarized_snvs <-.json_apply(json_lines, .summarize_snv,
+                                          BPPARAM=BPPARAM)
+        )
         if (chunksize >= 1L)
-            cat("ok\n")
+            cat("ok (in ", st[["elapsed"]], " sec.)\n", sep="")
         .dump_summarized_snvs(summarized_snvs, dump_dir)
         if (chunksize >= 1L)
             cat("\n")
