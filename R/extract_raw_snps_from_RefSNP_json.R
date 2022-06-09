@@ -55,7 +55,8 @@
     if (is.null(BPPARAM)) {
         lapply(json_lines, FUN_WRAPPER, FUN, ...)
     } else {
-        bplapply(as.list(json_lines), FUN_WRAPPER, FUN, ..., BPPARAM=BPPARAM)
+        json_lines <- as.list(json_lines)
+        bplapply(json_lines, FUN_WRAPPER, FUN, ..., BPPARAM=BPPARAM)
     }
 }
 
