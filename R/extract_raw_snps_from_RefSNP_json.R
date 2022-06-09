@@ -34,6 +34,33 @@
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### .json_apply()
+###
+
+.json_apply <- function(json_lines, FUN, ..., BPPARAM=NULL)
+{
+    FUN_WRAPPER <- function(json_line, FUN, ...) {
+        ## rjson::fromJSON() and jsonlite::parse_json() are both fast.
+        ## Beware of a caveat with the latter: using 'simplifyVector=TRUE'
+        ## makes it very slow and do weird things!
+        ## Very slow: it makes jsonlite::parse_json() about 20x slower
+        ## on 'refsnp-chrMT.json'! This is because the simplification is
+        ## implemented in pure R (via jsonlite:::simplify()).
+        ## Weird things: when parsing a RefSNP JSON file (e.g.
+        ## 'refsnp-chrMT.json') the "present_obs_movements" field gets
+        ## transformed in a weird way that makes it hard to work with.
+        snp <- rjson::fromJSON(json_line)
+        FUN(snp, ...)
+    }
+    if (is.null(BPPARAM)) {
+        lapply(json_lines, FUN_WRAPPER, FUN, ...)
+    } else {
+        bplapply(as.list(json_lines), FUN_WRAPPER, FUN, ..., BPPARAM=BPPARAM)
+    }
+}
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 ### Low-level helpers for parsing a RefSNP JSON files
 ###
 ### RefSNP JSON (partly) documented at:
@@ -185,25 +212,6 @@
          placements=summarized_placements)
 }
 
-.extract_summarized_snps_from_json_lines <-
-    function(json_lines, variant_type=NULL, seq_type=NULL)
-{
-    lapply(json_lines,
-        function(json_line) {
-            ## rjson::fromJSON() and jsonlite::parse_json() are both fast.
-            ## Beware of a caveat with the latter: using 'simplifyVector=TRUE'
-            ## makes it very slow and do weird things!
-            ## Very slow: it makes jsonlite::parse_json() about 20x slower
-            ## on 'refsnp-chrMT.json'! This is because the simplification is
-            ## implemented in pure R (via jsonlite:::simplify()).
-            ## Weird things: when parsing a RefSNP JSON file (e.g.
-            ## 'refsnp-chrMT.json') the "present_obs_movements" field gets
-            ## transformed in a weird way that makes it hard to work with.
-            snp <- rjson::fromJSON(json_line)
-            .summarize_snp(snp, variant_type=variant_type, seq_type=seq_type)
-        })
-}
-
 ### Returns a named list with 1 list element per SNP.
 quick_preview_RefSNP_json <-
     function(con, variant_type=NULL, seq_type=NULL, n=6)
@@ -219,8 +227,105 @@ quick_preview_RefSNP_json <-
     if (!(is.null(seq_type) || is.character(seq_type)))
         stop(wmsg("'seq_type' must be NULL or a character vector"))
     json_lines <- readLines(con, n=n)
-    .extract_summarized_snps_from_json_lines(json_lines,
-            variant_type=variant_type, seq_type=seq_type)
+    .json_apply(json_lines,
+                .summarize_snp, variant_type=variant_type, seq_type=seq_type)
+}
+
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### extract_snvs_from_RefSNP_json()
+###
+
+### Returns a 6-col data frame or a NULL.
+.summarize_snv <- function(snp)
+{
+    summarized_snp <- .summarize_snp(snp, variant_type="snv",
+                                          seq_type="refseq_chromosome")
+    if (is.null(summarized_snp))
+        return(NULL)
+    placements <- summarized_snp$placements
+    stopifnot(is.data.frame(placements))
+    keep_columns <- c("is_ptlp", "seq_id", "position",
+                      "deleted_sequence", "inserted_sequences")
+    cbind(refsnp_id=summarized_snp$refsnp_id,
+          placements[ , keep_columns, drop=FALSE])
+}
+
+### Returns a SplitDataFrameList object.
+.group_summarized_snvs_by_seq_id <- function(summarized_snvs)
+{
+    stopifnot(is.list(summarized_snvs))
+    DF <- as(do.call(rbind, summarized_snvs), "DataFrame")
+    j <- match("seq_id", colnames(DF))
+    stopifnot(!is.na(j))
+    f <- DF[ , j]
+    split(DF[ , -j, drop=FALSE], f)
+}
+
+.dump_summarized_snvs <- function(summarized_snvs, dump_dir)
+{
+    snvs_per_seq_id <- .group_summarized_snvs_by_seq_id(summarized_snvs)
+    for (i in seq_along(snvs_per_seq_id)) {
+        seq_id <- names(snvs_per_seq_id)[[i]]
+        out_file <- file.path(dump_dir, paste0(seq_id, ".tab"))
+        summarized_snvs <- as.data.frame(snvs_per_seq_id[[i]])
+        cat("  - writing ", nrow(summarized_snvs),
+            " snvs to ", out_file, " ... ", sep="")
+        write.table(summarized_snvs, file=out_file, append=TRUE,
+                    quote=FALSE, sep="\t", row.names=FALSE, col.names=FALSE)
+        cat("ok\n")
+    }
+    lengths(snvs_per_seq_id)
+}
+
+extract_snvs_from_RefSNP_json <- function(con, dump_dir,
+                                          chunksize=50000, BPPARAM=NULL)
+{
+    if (!isSingleNumber(chunksize))
+        stop(wmsg("'chunksize' must be a single integer"))
+    if (!is.integer(chunksize))
+        chunksize <- as.integer(chunksize)
+    if (is.character(con)) {
+        if (!isSingleString(con))
+            stop(wmsg("'con' must be a single string or a connection"))
+        con <- .open_local_file(con)
+        on.exit(close(con))
+    }
+    if (!isSingleString(dump_dir))
+        stop(wmsg("'dump_dir' must be a single string specifying the path ",
+                  "to the directory where to dump the snvs"))
+    if (!dir.exists(dump_dir))
+        stop(wmsg("'dump_dir' must be the path to an existing directory"))
+
+    offset <- 0L
+    while (TRUE) {
+        if (chunksize >= 1L)
+            cat("Reading lines (", chunksize, " max) ... ", sep="")
+        json_lines <- readLines(con, n=chunksize)
+        nline <- length(json_lines)
+        if (nline == 0L) {
+            if (chunksize >= 1L)
+                cat("no more lines to read!\n")
+            break
+        }
+        if (chunksize >= 1L) {
+            from <- offset + 1L
+            to <- offset + nline
+            cat("ok; processing lines ", from, "-", to, " ... ", sep="")
+        }
+        summarized_snvs <- .json_apply(json_lines, .summarize_snv,
+                                       BPPARAM=BPPARAM)
+        if (chunksize >= 1L)
+            cat("ok\n")
+        .dump_summarized_snvs(summarized_snvs, dump_dir)
+        if (chunksize >= 1L)
+            cat("\n")
+        offset <- offset + nline
+        if (chunksize >= 1L && nline < chunksize)
+            break
+    }
+    cat("DONE.\n")
+    invisible(offset)
 }
 
 
@@ -228,35 +333,9 @@ quick_preview_RefSNP_json <-
 ### extract_and_dispatch_snvs_from_RefSNP_json()
 ###
 
-### Returns a 6-col data frame.
-.from_summarized_snv_to_df <- function(summarized_snv)
+.dump_summarized_snvs2 <- function(summarized_snvs, dump_dir, outfile)
 {
-    if (is.null(summarized_snv))
-        return(NULL)
-    placements <- summarized_snv$placements
-    stopifnot(is.data.frame(placements))
-    keep_columns <- c("is_ptlp", "seq_id", "position",
-                      "deleted_sequence", "inserted_sequences")
-    cbind(refsnp_id=summarized_snv$refsnp_id,
-          placements[ , keep_columns, drop=FALSE])
-}
-
-.summarize_snvs_per_seq_id <- function(json_lines)
-{
-    summarized_snvs <- .extract_summarized_snps_from_json_lines(json_lines,
-                                variant_type="snv",
-                                seq_type="refseq_chromosome")
-    dfs <- lapply(summarized_snvs, .from_summarized_snv_to_df)
-    DF <- as(do.call(rbind, dfs), "DataFrame")
-    j <- match("seq_id", colnames(DF))
-    stopifnot(!is.na(j))
-    f <- DF[ , j]
-    split(DF[ , -j, drop=FALSE], f)
-}
-
-.dump_snvs_per_seq_id <- function(snvs_per_seq_id, dump_dir, outfile)
-{
-    stopifnot(is(snvs_per_seq_id, "SplitDataFrameList"))
+    snvs_per_seq_id <- .group_summarized_snvs_by_seq_id(summarized_snvs)
     for (i in seq_along(snvs_per_seq_id)) {
         seq_id <- names(snvs_per_seq_id)[[i]]
         seq_dir <- file.path(dump_dir, seq_id)
@@ -319,10 +398,10 @@ extract_and_dispatch_snvs_from_RefSNP_json <-
             to <- offset + nline
             cat("ok; processing lines ", from, "-", to, " ... ", sep="")
         }
-        snvs_per_seq_id <- .summarize_snvs_per_seq_id(json_lines)
+        summarized_snvs <- .json_apply(json_lines, .summarize_snv)
         if (chunksize >= 1L)
             cat("ok\n")
-        .dump_snvs_per_seq_id(snvs_per_seq_id, dump_dir, outfile)
+        .dump_summarized_snvs2(summarized_snvs, dump_dir, outfile)
         if (chunksize >= 1L)
             cat("\n")
         offset <- offset + nline
@@ -434,18 +513,8 @@ extract_and_dispatch_snvs_from_RefSNP_json <-
                                               paranoid=FALSE)
 {
     stopifnot(is.character(json_lines))
-    raw_snps <- lapply(json_lines,
-        function(json_line) {
-            ## rjson::fromJSON() and jsonlite::parse_json() are both fast.
-            ## Beware of a caveat with the latter: using 'simplifyVector=TRUE'
-            ## makes it very slow and do weird things!
-            ## Very slow: it makes jsonlite::parse_json() about 20x slower
-            ## on 'refsnp-chrMT.json'! This is because the simplification is
-            ## implemented in pure R (via jsonlite:::simplify()).
-            ## Weird things: when parsing a RefSNP JSON file (e.g.
-            ## 'refsnp-chrMT.json') the "present_obs_movements" field gets
-            ## transformed in a weird way that makes it hard to work with.
-            snp <- rjson::fromJSON(json_line)
+    raw_snps <- .json_apply(json_lines,
+        function(snp) {
             raw_snp <- try(.extract_raw_snp(snp, chrominfo, paranoid=paranoid))
             if (inherits(raw_snp, "try-error"))
                 stop(wmsg("Failed to extract raw snp from line ", json_line))
