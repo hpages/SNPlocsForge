@@ -279,6 +279,29 @@ quick_preview_RefSNP_json <-
     lengths(snvs_per_seq_id)
 }
 
+### Optimal chunksize seems to somehwat depend on number of workers. Some
+### timings for processing a RefSNP json file with 150000 lines (1 snp/line):
+###
+###   nb of workers   optimal chunksize   total time in sec.
+###   -------------   -----------------   -----------------
+###               8               10000             390.778
+###
+###              10                2500             420.672
+###              10                5000             377.874
+###              10               10000             373.494
+###              10               15000             370.211
+###              10               20000             370.749
+###              10               25000             393.568
+###
+###              16                5000
+###              16               10000             305.232
+###              16               15000             330.971
+###              16               20000             275.598
+###              16               25000             348.339
+###              16               30000             346.602
+###
+###              32               40000             269.055
+###
 extract_snvs_from_RefSNP_json <- function(con, dump_dir,
                                           chunksize=10000, BPPARAM=NULL)
 {
