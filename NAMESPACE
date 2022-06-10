@@ -14,7 +14,6 @@ import(GenomicRanges)
 export(
     quick_preview_RefSNP_json,
     extract_snvs_from_RefSNP_json,
-    extract_and_dispatch_snvs_from_RefSNP_json,
     extract_raw_snps_from_RefSNP_json,
     build_OnDiskLongTable
 )
