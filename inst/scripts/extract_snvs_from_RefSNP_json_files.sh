@@ -20,37 +20,37 @@ start_extraction()
 	jsonfile="${JSON_PREFIX}${chr}${JSON_SUFFIX}"
 	dump_subdir="$DUMP_DIR/$chr"
 	mkdir $dump_subdir
-	logfile="$DUMP_DIR/${jsonfile}.log"
+	logfile="$DUMP_DIR/${chr}.log"
 	echo "Start processing ${jsonfile}."
 	Rexpr="library(SNPlocsForge)"
-	Rexpr="$Rexpr; BPPARAM <- MulticoreParam($nworkers)"
+	Rexpr="$Rexpr; BPPARAM <- if ($nworkers == 1) NULL else MulticoreParam($nworkers)"
 	Rexpr="$Rexpr; system.time(extract_snvs_from_RefSNP_json('$jsonfile', '$dump_subdir', $chunksize, BPPARAM))"
-	$Rscript -e "$Rexpr" >$logfile 2>&1 &
+	$Rscript -e "$Rexpr" >$logfile 2>&1
 }
 
-start_extraction chr1  8 15000
-start_extraction chr2  8 15000
-start_extraction chr3  7 12500
-start_extraction chr4  6 12000
-start_extraction chr5  5 11000
-start_extraction chr6  5 11000
-start_extraction chr7  5 11000
-start_extraction chr8  5 11000
-start_extraction chr9  4 10000
-start_extraction chr10 4 10000
-start_extraction chr11 4 10000
-start_extraction chr12 4 10000
-start_extraction chr13 3  8000
-start_extraction chr14 3  8000
-start_extraction chr15 3  8000
-start_extraction chr16 3  8000
-start_extraction chr17 3  8000
-start_extraction chr18 2  6000
-start_extraction chr19 2  6000
-start_extraction chr20 2  6000
-start_extraction chr21 1  5000
-start_extraction chr22 1  5000
-start_extraction chrX  3  8000
-start_extraction chrY  1  5000
-start_extraction chrMT 1  5000
+start_extraction chr1  9 15000 &
+start_extraction chr2  9 15000 &
+start_extraction chr3  7 12500 &
+start_extraction chr4  6 12000 &
+start_extraction chr5  5 11000 &
+start_extraction chr6  5 11000 &
+start_extraction chr7  5 11000 &
+start_extraction chr8  5 11000 &
+start_extraction chr9  4 10000 &
+start_extraction chr10 4 10000 &
+start_extraction chr11 4 10000 &
+start_extraction chr12 4 10000 &
+start_extraction chr13 4 10000 &
+start_extraction chr14 4 10000 &
+start_extraction chr15 1  5000 &
+start_extraction chr16 1  5000 &
+start_extraction chr17 1  5000 &
+start_extraction chr18 1  5000 &
+start_extraction chr19 1  5000 &
+start_extraction chr20 1  5000 &
+start_extraction chr21 1  5000 &
+start_extraction chr22 1  5000 &
+start_extraction chrX  4 10000 &
+start_extraction chrY  1  5000 &
+start_extraction chrMT 1  5000 &
 
