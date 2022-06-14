@@ -252,11 +252,13 @@ quick_preview_RefSNP_json <-
           placements[ , keep_columns, drop=FALSE])
 }
 
-### Returns a SplitDataFrameList object.
+### Returns a SplitDataFrameList object or a NULL.
 .group_summarized_snvs_by_seq_id <- function(summarized_snvs)
 {
     stopifnot(is.list(summarized_snvs))
     DF <- as(do.call(rbind, summarized_snvs), "DataFrame")
+    if (nrow(DF) == 0L)
+        return(NULL)
     j <- match("seq_id", colnames(DF))
     stopifnot(!is.na(j))
     f <- DF[ , j]
@@ -266,11 +268,16 @@ quick_preview_RefSNP_json <-
 .dump_summarized_snvs <- function(summarized_snvs, dump_dir)
 {
     snvs_per_seq_id <- .group_summarized_snvs_by_seq_id(summarized_snvs)
+    nb_snvs <- if (is.null(snvs_per_seq_id)) 0L
+               else nrow(unlist(snvs_per_seq_id, use.names=FALSE))
+    cat("  --> ", nb_snvs, " snvs extracted\n", sep="")
+    if (nb_snvs == 0L)
+        return(NULL)
     for (i in seq_along(snvs_per_seq_id)) {
         seq_id <- names(snvs_per_seq_id)[[i]]
         out_file <- file.path(dump_dir, paste0(seq_id, ".tab"))
         summarized_snvs <- as.data.frame(snvs_per_seq_id[[i]])
-        cat("  - writing ", nrow(summarized_snvs),
+        cat("    - writing ", nrow(summarized_snvs),
             " snvs to ", out_file, " ... ", sep="")
         write.table(summarized_snvs, file=out_file, append=TRUE,
                     quote=FALSE, sep="\t", row.names=FALSE, col.names=FALSE)
