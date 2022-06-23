@@ -28,6 +28,7 @@ start_extraction()
 	$Rscript -e "$Rexpr" >$logfile 2>&1
 }
 
+# Takes about 100 hours on rex3 (80 logical cpus):
 start_extraction chr1  9 15000 &
 start_extraction chr2  9 15000 &
 start_extraction chr3  7 12500 &
@@ -36,7 +37,7 @@ start_extraction chr5  5 11000 &
 start_extraction chr6  5 11000 &
 start_extraction chr7  5 11000 &
 start_extraction chr8  5 11000 &
-start_extraction chr9  5 11000 &
+start_extraction chr9  1  5000 &
 start_extraction chr10 1  5000 &
 start_extraction chr11 1  5000 &
 start_extraction chr12 1  5000 &
