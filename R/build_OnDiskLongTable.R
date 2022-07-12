@@ -1,10 +1,18 @@
 ###
 
-.load_raw_snps <- function(filepath)
+.collect_snv_files <- function(seqname, chrominfo, all_snv_files)
+{
+    m <- match(seqname, chrominfo[ , "SequenceName"])
+    if (is.na(m))
+        stop(wmsg("unknown chromosome: ", seqname))
+    fname <- paste0(chrominfo[m, "RefSeqAccn"], ".tab")
+    all_snv_files[which(basename(all_snv_files) == fname)]
+}
+
+.load_snvs <- function(filepath)
 {
     COL2CLASS <- c(rsid="integer",
-                   variant_type="character",
-                   seqname="character",
+                   is_ptlp="logical",
                    pos0="integer",
                    deleted_sequence="character",
                    inserted_sequences="character")
@@ -13,43 +21,31 @@
                stringsAsFactors=FALSE)
 }
 
-.bad_snps <- function(raw_snps, bad_idx)
+.load_snvs_from_multiple_files <- function(filenames)
 {
-    bad_snps <- raw_snps[bad_idx, "rsid"]
-    nbad <- length(bad_snps)
-    if (nbad > 6L)
-        bad_snps <- c(head(bad_snps, n=5L), "...")
-    bad_snps <- paste(bad_snps, collapse=", ")
-    if (nbad > 6L)
-        bad_snps <- paste0(bad_snps, " [", nbad - 5L, " more]")
-    bad_snps
+    snvs <- lapply(filenames,
+        function(filename) {
+            cat("- Reading ", filename, " ... ", sep="")
+            snvs <- .load_snvs(filename)
+            cat("OK [", nrow(snvs), " SNVs loaded]\n", sep="")
+            snvs
+        })
+    do.call(rbind, snvs)
 }
 
-### Return SNPs of type "snv" in a 3-col data.frame:
+### Return SNVs in a 3-col data.frame:
 ###   1. rsid: integer vector (RefSNP id without "rs" prefix)
 ###   2. pos: integer vector (one-based position)
 ###   3. alleles: raw vector (alleles as an IUPAC letter turned into
 ###      byte value).
-.cook_raw_snps <- function(raw_snps, expected_seqname)
+.cook_snvs <- function(snvs)
 {
-    stopifnot(isSingleString(expected_seqname))
-
-    ## Keep SNPs located on expected seqname only.
-    seqname <- raw_snps[ , "seqname"]
-    keep_idx <- which(seqname == expected_seqname)
-    raw_snps <- raw_snps[keep_idx, , drop=FALSE]
-
-    ## Keep SNPs of type "snv" only.
-    type <- raw_snps[ , "variant_type"]
-    keep_idx <- which(type == "snv")
-    raw_snps <- raw_snps[keep_idx, , drop=FALSE]
-
-    rsid <- raw_snps[ , "rsid"]
+    rsid <- snvs[ , "rsid"]
     stopifnot(is.integer(rsid))
 
-    pos <- raw_snps[ , "pos0"] + 1L
+    pos <- snvs[ , "pos0"] + 1L
 
-    alleles <- gsub("/", "", raw_snps[ , "inserted_sequences"], fixed=TRUE)
+    alleles <- gsub(",", "", snvs[ , "inserted_sequences"], fixed=TRUE)
     alleles <- BSgenome:::encode_letters_as_bytes(mergeIUPACLetters(alleles))
 
     ans <- data.frame(rsid=rsid,
@@ -66,18 +62,18 @@
 ### dbSNP 151) was reported to be at position 143544518 on chromosome 14 in
 ### GRCh38.p7, even though the length of this chromosome is 107043718. We
 ### drop these SNPs.
-.drop_out_of_bounds_snps <- function(cooked_snps, seqlength)
+.drop_out_of_bounds_snvs <- function(cooked_snvs, seqlength)
 {
-    pos <- cooked_snps[ , "pos"]
+    pos <- cooked_snvs[ , "pos"]
     is_out_of_bounds <- pos < 1L | pos > seqlength
     nb_out_of_bounds <- sum(is_out_of_bounds)
     if (nb_out_of_bounds != 0L) {
-        cat("  DROP ", nb_out_of_bounds, " OUT OF BOUNDS SNPS! ... ", sep="")
+        cat("  DROP ", nb_out_of_bounds, " OUT OF BOUNDS SNVS! ... ", sep="")
         keep_idx <- which(!is_out_of_bounds)
-        cooked_snps <- cooked_snps[keep_idx, , drop=FALSE]
+        cooked_snvs <- cooked_snvs[keep_idx, , drop=FALSE]
         cat("OK\n")
     }
-    cooked_snps
+    cooked_snvs
 }
 
 .build_spatial_index <- function(pos, batchsize, seqname, seqinfo)
@@ -94,52 +90,59 @@
 }
 
 ### 'seqnames' must be a single string (e.g. "20 21 22")
-build_OnDiskLongTable <- function(tmp_dir, seqnames, assembly="GRCh38.p13",
-                                  chr_prefix="chr", batchsize=200000L)
+build_OnDiskLongTable <- function(dump_dir, seqnames, assembly="GRCh38.p13",
+                                  batchsize=200000L)
 {
     stopifnot(isSingleString(assembly))
+
+    COLNAMES <- c("SequenceName", "SequenceLength", "circular",
+                  "GenBankAccn", "RefSeqAccn")
+    ci <- read.table("seqinfo.txt", col.names=COLNAMES, stringsAsFactors=FALSE)
+    ci2 <- getChromInfoFromNCBI(assembly, assembled.molecules.only=TRUE)
+    stopifnot(identical(ci, ci2[ , colnames(ci)]))
+    seqinfo <- Seqinfo(ci[ , "SequenceName"], ci[ , "SequenceLength"],
+                       ci[ , "circular"], assembly)
+
+    all_snv_files <- dir(dump_dir, pattern="\\.tab$", recursive=TRUE,
+                         full.names=TRUE)
 
     cat("\n")
     cat("***************** START build_OnDiskLongTable() ******************\n")
 
     seqnames <- strsplit(seqnames, " ", fixed=TRUE)[[1L]]
-
-    seqinfo <- BSgenome:::read_seqinfo_table("seqinfo.txt", genome=assembly)
-
     rowids <- vector("list", length=length(seqnames))
     names(rowids) <- seqnames
 
     append <- FALSE
     for (seqname in seqnames) {
         cat("\n")
-        cat("Processing SNPs for chromosome ", seqname, ":\n", sep="")
+        cat("Processing SNVs for chromosome ", seqname, ":\n", sep="")
 
-        filename <- paste0(chr_prefix, seqname, "_raw_snps.tab")
-        cat("  Loading raw SNPs from ", filename, " ... ", sep="")
-        filepath <- file.path(tmp_dir, filename)
-        raw_snps <- .load_raw_snps(filepath)
-        cat("OK [", nrow(raw_snps), " raw SNPs loaded]\n", sep="")
+        filenames <- .collect_snv_files(seqname, ci, all_snv_files)
+        snvs <- .load_snvs_from_multiple_files(filenames)
+        cat("- Total number of SNVs on chromosome ", seqname, ": ",
+            nrow(snvs), "\n", sep="")
 
-        cat("  Cooking raw SNPs ... ", sep="")
-        cooked_snps <- .cook_raw_snps(raw_snps, seqname)
+        cat("- Cooking the SNVs ... ", sep="")
+        cooked_snvs <- .cook_snvs(snvs)
         cat("OK\n")
 
         seqlength <- seqlengths(seqinfo)[[seqname]]
-        cooked_snps <- .drop_out_of_bounds_snps(cooked_snps, seqlength)
+        cooked_snvs <- .drop_out_of_bounds_snvs(cooked_snvs, seqlength)
 
-        rowids[[seqname]] <- cooked_snps[ , 1L]
+        rowids[[seqname]] <- cooked_snvs[ , 1L]
 
-        df <- cooked_snps[ , -1L, drop=FALSE]
+        df <- cooked_snvs[ , -1L, drop=FALSE]
         spatial_index <- .build_spatial_index(df[ , "pos"], batchsize,
                                               seqname, seqinfo)
-        fmt <- paste0("%s ", nrow(df), " cooked SNPs ",
+        fmt <- paste0("- %s ", nrow(df), " cooked SNVs ",
                       "%s OnDiskLongTable directory structure")
         if (!append) {
             msg <- sprintf(fmt, "Writing", "as")
         } else {
             msg <- sprintf(fmt, "Appending", "to")
         }
-        cat("  ", msg, " ... ", sep="")
+        cat(msg, " ... ", sep="")
         writeOnDiskLongTable(df, spatial_index=spatial_index,
                                  append=append)
         append <- TRUE
@@ -149,6 +152,7 @@ build_OnDiskLongTable <- function(tmp_dir, seqnames, assembly="GRCh38.p13",
     cat("\n")
 
     rowids <- unlist(rowids, recursive=FALSE, use.names=FALSE)
+
     cat("Adding RefSNP ids to OnDiskLongTable directory structure ... ")
     ## Using compress="xz" reduces the size on disk by < 2% but makes further
     ## loading of the row ids (with readRDS()) 8x slower. Not worth it!
@@ -158,7 +162,7 @@ build_OnDiskLongTable <- function(tmp_dir, seqnames, assembly="GRCh38.p13",
 
     cat("\n")
     cat("****************** END build_OnDiskLongTable() *******************\n")
-    cat("Total number of SNPs written to disk: ", length(rowids), "\n", sep="")
+    cat("Total number of SNVs written to disk: ", length(rowids), "\n", sep="")
     cat("\n")
 }
 
