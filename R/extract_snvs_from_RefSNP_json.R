@@ -477,7 +477,7 @@ extract_snvs_from_RefSNP_json <- function(con, dump_dir,
         function(snp) {
             raw_snp <- try(.extract_raw_snp(snp, chrominfo, paranoid=paranoid))
             if (inherits(raw_snp, "try-error"))
-                stop(wmsg("Failed to extract raw snp from line ", json_line))
+                stop(wmsg("Failed to extract raw snp from line ", snp))
             raw_snp
         })
     do.call(rbind, raw_snps)

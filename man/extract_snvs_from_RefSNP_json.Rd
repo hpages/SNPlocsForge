@@ -85,11 +85,11 @@ dir.create(dump_dir)
 ## Should take about 15 sec.:
 extract_snvs_from_RefSNP_json(json_file, dump_dir, BPPARAM=MulticoreParam(6))
 
-setwd(dump_dir)
+## Let's take a look at the output:
+old_wd <- setwd(dump_dir)
 dir()
-
 cat(head(readLines("NC_012920.1.tab")), sep="\n")
-
 read.delim("NC_012920.1.tab", header=FALSE, nrows=15)
+setwd(old_wd)
 }
 \keyword{utilities}
