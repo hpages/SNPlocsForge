@@ -1,5 +1,5 @@
 ### =========================================================================
-### extract_raw_snps_from_RefSNP_json()
+### extract_snvs_from_RefSNP_json()
 ### -------------------------------------------------------------------------
 
 
@@ -374,7 +374,7 @@ extract_snvs_from_RefSNP_json <- function(con, dump_dir,
 
 
 ### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-### extract_raw_snps_from_RefSNP_json()
+### OBSOLETE - extract_raw_snps_from_RefSNP_json()
 ###
 
 ### Returns NULL if not a preferred top level placement (PTLP).

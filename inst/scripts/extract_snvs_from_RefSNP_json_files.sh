@@ -3,7 +3,7 @@
 
 set -e  # exit immediately if a simple command returns a non-zero status
 
-# Settings for dbSNP155 on rex3 (80 logical cpus):
+# Settings for dbSNP155 on rex3 (80 logical cpus), will extract 58G of data:
 JSON_DIR="/home/hpages/SNPlocsForge/downloads/dbSNP155"
 DUMP_DIR="$JSON_DIR/snvs_dump"
 JSON_PREFIX="refsnp-"
