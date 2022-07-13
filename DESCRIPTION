@@ -4,7 +4,7 @@ Description: Provides tools to build SNPlocs data packages from RefSNP JSON
 	files.
 biocViews: Genetics, Infrastructure, DataRepresentation, Annotation, SNP
 URL: https://bioconductor.org/packages/SNPlocsForge
-Version: 0.0.6
+Version: 0.0.7
 License: Artistic-2.0
 Encoding: UTF-8
 Author: Hervé Pagès

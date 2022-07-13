@@ -15,6 +15,7 @@ export(
     quick_preview_RefSNP_json,
     extract_snvs_from_RefSNP_json,
     extract_raw_snps_from_RefSNP_json,
+    select_snvs,
     build_OnDiskLongTable
 )
 

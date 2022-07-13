@@ -93,7 +93,10 @@
 build_OnDiskLongTable <- function(dump_dir, seqnames, assembly="GRCh38.p13",
                                   batchsize=200000L)
 {
-    stopifnot(isSingleString(assembly))
+    stopifnot(isSingleString(dump_dir),
+              isSingleString(seqnames),
+              isSingleString(assembly),
+              isSingleNumber(batchsize))
 
     COLNAMES <- c("SequenceName", "SequenceLength", "circular",
                   "GenBankAccn", "RefSeqAccn")
