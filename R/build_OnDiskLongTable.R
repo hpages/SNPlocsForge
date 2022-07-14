@@ -1,4 +1,7 @@
-###
+### =========================================================================
+### build_OnDiskLongTable()
+### -------------------------------------------------------------------------
+
 
 .collect_snv_files <- function(seqname, chrominfo, all_snv_files)
 {
@@ -7,30 +10,6 @@
         stop(wmsg("unknown chromosome: ", seqname))
     fname <- paste0(chrominfo[m, "RefSeqAccn"], ".tab")
     all_snv_files[which(basename(all_snv_files) == fname)]
-}
-
-.load_snvs <- function(filepath)
-{
-    COL2CLASS <- c(rsid="integer",
-                   is_ptlp="logical",
-                   pos0="integer",
-                   deleted_sequence="character",
-                   inserted_sequences="character")
-    read.table(filepath, sep="\t", quote="", col.names=names(COL2CLASS),
-               na.strings="?", colClasses=unname(COL2CLASS),
-               stringsAsFactors=FALSE)
-}
-
-.load_snvs_from_multiple_files <- function(filenames)
-{
-    snvs <- lapply(filenames,
-        function(filename) {
-            cat("- Reading ", filename, " ... ", sep="")
-            snvs <- .load_snvs(filename)
-            cat("OK [", nrow(snvs), " SNVs loaded]\n", sep="")
-            snvs
-        })
-    do.call(rbind, snvs)
 }
 
 ### Return SNVs in a 3-col data.frame:
@@ -121,14 +100,14 @@ build_OnDiskLongTable <- function(dump_dir, seqnames, assembly="GRCh38.p13",
         cat("\n")
         cat("Processing SNVs for chromosome ", seqname, ":\n", sep="")
 
-        filenames <- .collect_snv_files(seqname, ci, all_snv_files)
-        snvs <- .load_snvs_from_multiple_files(filenames)
-        cat("- Total number of SNVs on chromosome ", seqname, ": ",
+        filepaths <- .collect_snv_files(seqname, ci, all_snv_files)
+        snvs <- do.call(rbind, load_snvs_from_multiple_files(filepaths))
+        cat("- total number of SNVs on chromosome ", seqname, ": ",
             nrow(snvs), "\n", sep="")
 
-        cat("- Cooking the SNVs ... ", sep="")
+        cat("- cooking the SNVs ... ", sep="")
         cooked_snvs <- .cook_snvs(snvs)
-        cat("OK\n")
+        cat("ok\n")
 
         seqlength <- seqlengths(seqinfo)[[seqname]]
         cooked_snvs <- .drop_out_of_bounds_snvs(cooked_snvs, seqlength)
@@ -141,15 +120,15 @@ build_OnDiskLongTable <- function(dump_dir, seqnames, assembly="GRCh38.p13",
         fmt <- paste0("- %s ", nrow(df), " cooked SNVs ",
                       "%s OnDiskLongTable directory structure")
         if (!append) {
-            msg <- sprintf(fmt, "Writing", "as")
+            msg <- sprintf(fmt, "writing", "as")
         } else {
-            msg <- sprintf(fmt, "Appending", "to")
+            msg <- sprintf(fmt, "appending", "to")
         }
         cat(msg, " ... ", sep="")
         writeOnDiskLongTable(df, spatial_index=spatial_index,
                                  append=append)
         append <- TRUE
-        cat("OK\n")
+        cat("ok\n")
     }
 
     cat("\n")

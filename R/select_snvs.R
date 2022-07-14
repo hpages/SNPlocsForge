@@ -3,17 +3,9 @@
 ### -------------------------------------------------------------------------
 
 
-### Select the snv files that belong to the specified assembly.
-.select_snv_files <- function(dump_dir, assembly)
-{
-    stopifnot(isSingleString(dump_dir))
-
-    chrominfo <- getChromInfoFromNCBI(assembly, assembled.molecules.only=TRUE)
-    target_files <- paste0(chrominfo[ , "RefSeqAccn"], ".tab")
-
-    snv_files <- dir(dump_dir, pattern="\\.tab$", full.names=TRUE)
-    snv_files[basename(snv_files) %in% target_files]
-}
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### I/O helpers
+###
 
 .load_snvs <- function(file)
 {
@@ -27,16 +19,17 @@
                stringsAsFactors=FALSE)
 }
 
-.load_snvs_from_multiple_files <- function(filepaths)
+### Used by .load_selected_snvs_from_multiple_files() defined in
+### file build_OnDiskLongTable.R
+load_snvs_from_multiple_files <- function(filepaths)
 {
-    snv_dfs <- lapply(setNames(filepaths, basename(filepaths)),
+    lapply(setNames(filepaths, basename(filepaths)),
         function(filepath) {
             cat("- loading SNVs from ", filepath, " ... ", sep="")
             snvs <- .load_snvs(filepath)
             cat("ok [", nrow(snvs), " SNVs loaded]\n", sep="")
             snvs
         })
-    snv_dfs
 }
 
 .save_snvs <- function(snvs, file)
@@ -67,6 +60,23 @@
     }
 }
 
+
+### - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+### select_snvs()
+###
+
+### Select the snv files that belong to the specified assembly.
+.select_snv_files <- function(dump_dir, assembly)
+{
+    stopifnot(isSingleString(dump_dir))
+
+    chrominfo <- getChromInfoFromNCBI(assembly, assembled.molecules.only=TRUE)
+    target_files <- paste0(chrominfo[ , "RefSeqAccn"], ".tab")
+
+    snv_files <- dir(dump_dir, pattern="\\.tab$", full.names=TRUE)
+    snv_files[basename(snv_files) %in% target_files]
+}
+
 ### Must be run after extract_snvs_from_RefSNP_json().
 ### Usage:
 ###   dump_dir <- "~/SNPlocsForge/downloads/dbSNP155/snvs_dump/chr22"
@@ -78,7 +88,7 @@ select_snvs <- function(dump_dir, out_dir, assembly="GRCh38.p13")
 
     snv_files <- .select_snv_files(dump_dir, assembly)
 
-    original_snv_dfs <- .load_snvs_from_multiple_files(snv_files)
+    original_snv_dfs <- load_snvs_from_multiple_files(snv_files)
     nrows <- vapply(original_snv_dfs, nrow, integer(1))
     original_snv_dfs <- original_snv_dfs[order(nrows, decreasing=TRUE)]
 
