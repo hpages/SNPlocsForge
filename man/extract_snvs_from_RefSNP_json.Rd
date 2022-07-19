@@ -91,5 +91,6 @@ dir()
 cat(head(readLines("NC_012920.1.tab")), sep="\n")
 read.delim("NC_012920.1.tab", header=FALSE, nrows=15)
 setwd(old_wd)
+unlink(dump_dir, recursive=TRUE)
 }
 \keyword{utilities}
