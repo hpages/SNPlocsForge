@@ -139,9 +139,6 @@ build_OnDiskLongTable <- function(dump_dir, seqnames, assembly="GRCh38.p13",
     rowids <- unlist(rowids, recursive=FALSE, use.names=FALSE)
 
     cat("Adding RefSNP ids to OnDiskLongTable directory structure ... ")
-    ## Using compress="xz" reduces the size on disk by < 2% but makes further
-    ## loading of the row ids (with readRDS()) 8x slower. Not worth it!
-    #writeOnDiskLongTableRowids(rowids, compress="xz")
     writeOnDiskLongTableRowids(rowids, nchunk=rowids_nchunk)
     cat("OK\n")
 
