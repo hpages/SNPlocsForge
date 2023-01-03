@@ -70,12 +70,15 @@
 
 ### 'seqnames' must be a single string (e.g. "20 21 22")
 build_OnDiskLongTable <- function(dump_dir, seqnames, assembly="GRCh38.p13",
-                                  batchsize=200000L)
+                                  batchsize=200000L, rowids_nchunk=6L)
 {
     stopifnot(isSingleString(dump_dir),
               isSingleString(seqnames),
               isSingleString(assembly),
-              isSingleNumber(batchsize))
+              isSingleNumber(batchsize),
+              isSingleNumber(rowids_nchunk),
+              rowids_nchunk >= 1L,
+              rowids_nchunk <= 9L)
 
     COLNAMES <- c("SequenceName", "SequenceLength", "circular",
                   "GenBankAccn", "RefSeqAccn")
@@ -139,7 +142,7 @@ build_OnDiskLongTable <- function(dump_dir, seqnames, assembly="GRCh38.p13",
     ## Using compress="xz" reduces the size on disk by < 2% but makes further
     ## loading of the row ids (with readRDS()) 8x slower. Not worth it!
     #writeOnDiskLongTableRowids(rowids, compress="xz")
-    writeOnDiskLongTableRowids(rowids)
+    writeOnDiskLongTableRowids(rowids, nchunk=rowids_nchunk)
     cat("OK\n")
 
     cat("\n")
