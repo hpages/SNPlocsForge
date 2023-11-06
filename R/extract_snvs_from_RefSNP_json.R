@@ -67,6 +67,52 @@
 ### RefSNP JSON (partly) documented at:
 ###   https://github.com/USF-HII/snptk/wiki/dbSNPJson
 ###
+### We are only interested in the following parts of a JSON record:
+###   { -- named list of length 10 (dict) --
+###     "refsnp_id": string
+###     "present_obs_movements": array (1 elt per movement)
+###       [
+###         { -- named list of length 6 (dict) --
+###           "allele_in_cur_release":
+###             { -- SPDI object (named list of length 4) --
+###               "seq_id": string
+###               "position": integer
+###               "deleted_sequence": string
+###               "inserted_sequence": string
+###             }
+###         }
+###       ]
+###     "primary_snapshot_data":
+###       { -- named list of length 6 (dict) --
+###         "variant_type": string
+###         "placements_with_allele": array (1 elt per placement)
+###           [
+###             { -- named list of length 4 (dict) --
+###               "seq_id": string
+###               "is_ptlp": bool
+###               "placement_annot":
+###                 { -- named list of length 5 (dict) --
+###                   "seq_type": string
+###                 }
+###               "alleles": array (1 elt per allele)
+###                 [
+###                   { -- named list of length 2 (dict) --
+###                     "allele":
+###                       { -- named list of length 1 (dict) --
+###                         "spdi":
+###                           { -- SPDI object (named list of length 4) --
+###                             "seq_id": string
+###                             "position": integer
+###                             "deleted_sequence": string
+###                             "inserted_sequence": string
+###                           }
+###                       }
+###                   }
+###                 ]
+###             }
+###           ]
+###       }
+###   }
 
 .EXPECTED_SPDI_FIELDS <- c(
     "seq_id",
