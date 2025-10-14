@@ -2,6 +2,9 @@
 #
 # To run this script in "batch mode":
 #
+#   cd /home/hpages/SNPlocsForge/downloads/dbSNP157
+#   mkdir GRCh38_snvs
+#   cd GRCh38_snvs
 #   /home/hpages/SNPlocsForge/SNPlocsForge/inst/scripts/dbSNP157/select_GRCh38_snvs.sh >select_GRCh38_snvs.log 2>&1 &
 #
 

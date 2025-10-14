@@ -9,7 +9,7 @@
 
 .load_snvs <- function(file)
 {
-    COL2CLASS <- c(rsid="integer",
+    COL2CLASS <- c(rsid="numeric",
                    is_ptlp="logical",
                    pos0="integer",
                    deleted_sequence="character",
@@ -93,12 +93,12 @@ select_snvs <- function(dump_dir, out_dir, assembly="GRCh38.p13")
     original_snv_dfs <- original_snv_dfs[order(nrows, decreasing=TRUE)]
 
     cat("- keeping one placement per RefSNP id ... ")
-    all_rsids <- IntegerList(lapply(original_snv_dfs,
+    all_rsids <- NumericList(lapply(original_snv_dfs,
                                     function(snvs) snvs[ , "rsid"]))
     rsids <- unlist(all_rsids, use.names=FALSE)
-    keep_idx <- relist(!duplicated(rsids), all_rsids)
-    selected_snv_dfs <- mapply(function(snvs, idx) snvs[idx, , drop=FALSE],
-                               original_snv_dfs, keep_idx, SIMPLIFY=FALSE)
+    keepme <- relist(!duplicated(rsids), all_rsids)
+    selected_snv_dfs <- mapply(function(snvs, km) snvs[km, , drop=FALSE],
+                               original_snv_dfs, keepme, SIMPLIFY=FALSE)
     cat("ok\n")
 
     .save_selected_snvs_to_multiple_files(selected_snv_dfs, out_dir,
