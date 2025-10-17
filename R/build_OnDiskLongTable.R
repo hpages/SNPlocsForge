@@ -13,14 +13,14 @@
 }
 
 ### Return SNVs in a 3-col data.frame:
-###   1. rsid: integer vector (RefSNP id without "rs" prefix)
+###   1. rsid: numeric vector (RefSNP id without "rs" prefix)
 ###   2. pos: integer vector (one-based position)
 ###   3. alleles: raw vector (alleles as an IUPAC letter turned into
 ###      byte value).
 .cook_snvs <- function(snvs)
 {
     rsid <- snvs[ , "rsid"]
-    stopifnot(is.integer(rsid))
+    stopifnot(is.numeric(rsid))
 
     pos <- snvs[ , "pos0"] + 1L
 
@@ -69,7 +69,7 @@
 }
 
 ### 'seqnames' must be a single string (e.g. "20 21 22")
-build_OnDiskLongTable <- function(dump_dir, seqnames, assembly="GRCh38.p13",
+build_OnDiskLongTable <- function(dump_dir, seqnames, assembly="GRCh38.p14",
                                   batchsize=200000L, rowids_nchunk=6L)
 {
     stopifnot(isSingleString(dump_dir),

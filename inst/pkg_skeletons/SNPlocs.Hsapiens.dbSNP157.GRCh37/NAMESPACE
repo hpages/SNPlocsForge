@@ -1,0 +1,13 @@
+import(methods)
+
+import(BiocGenerics)
+import(S4Vectors)
+import(IRanges)
+import(Seqinfo)
+import(GenomicRanges)
+import(BSgenome)
+
+### No need to export anything here: the SNPlocs object defined in this
+### package is created and dynamically exported at load time (refer to R/zzz.R
+### for the details).
+

@@ -2,7 +2,7 @@
 #
 # Run this script after download_json_files.sh:
 #
-#   cd /home/hpages/SNPlocsForge
+#   cd /home/hpages/snplocs_forge
 #   mkdir downloads/dbSNP157/snvs_dump
 #   ./SNPlocsForge/inst/scripts/dbSNP157/extract_snvs_from_RefSNP_json_files.sh
 #
@@ -14,7 +14,7 @@
 set -e  # exit immediately if a simple command returns a non-zero status
 
 # Settings for dbSNP157 on rex3 (80 logical cpus), will extract 58G of data:
-JSON_DIR="/home/hpages/SNPlocsForge/downloads/dbSNP157"
+JSON_DIR="/home/hpages/snplocs_forge/downloads/dbSNP157"
 DUMP_DIR="$JSON_DIR/snvs_dump"
 JSON_PREFIX="refsnp-"
 JSON_SUFFIX=".json.bz2"

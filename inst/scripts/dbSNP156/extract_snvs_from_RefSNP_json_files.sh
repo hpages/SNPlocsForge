@@ -4,7 +4,7 @@
 set -e  # exit immediately if a simple command returns a non-zero status
 
 # Settings for dbSNP156 on rex3 (80 logical cpus), will extract 58G of data:
-JSON_DIR="/home/hpages/SNPlocsForge/downloads/dbSNP156"
+JSON_DIR="/home/hpages/snplocs_forge/downloads/dbSNP156"
 DUMP_DIR="$JSON_DIR/snvs_dump"
 JSON_PREFIX="refsnp-"
 JSON_SUFFIX=".json.bz2"

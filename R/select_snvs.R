@@ -79,10 +79,10 @@ load_snvs_from_multiple_files <- function(filepaths)
 
 ### Must be run after extract_snvs_from_RefSNP_json().
 ### Usage:
-###   dump_dir <- "~/SNPlocsForge/downloads/dbSNP155/snvs_dump/chr22"
-###   out_dir  <- "~/SNPlocsForge/downloads/dbSNP155/GRCh37_snvs/chr22"
+###   dump_dir <- "~/snplocs_forge/downloads/dbSNP155/snvs_dump/chr22"
+###   out_dir  <- "~/snplocs_forge/downloads/dbSNP155/GRCh37_snvs/chr22"
 ###   select_snvs(dump_dir, out_dir, assembly="GRCh37.p13")
-select_snvs <- function(dump_dir, out_dir, assembly="GRCh38.p13")
+select_snvs <- function(dump_dir, out_dir, assembly="GRCh38.p14")
 {
     stopifnot(isSingleString(out_dir))
 

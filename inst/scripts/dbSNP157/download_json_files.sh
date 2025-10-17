@@ -2,7 +2,7 @@
 # 
 # To run this script in "batch mode":
 #
-#   cd /home/hpages/SNPlocsForge
+#   cd /home/hpages/snplocs_forge
 #   mkdir -p downloads/dbSNP157
 #   cd downloads/dbSNP157
 #   ../../SNPlocsForge/inst/scripts/dbSNP157/download_json_files.sh >download_json_files.log 2>&1 &

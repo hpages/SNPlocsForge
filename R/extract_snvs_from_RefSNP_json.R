@@ -536,7 +536,7 @@ extract_snvs_from_RefSNP_json <- function(con, dump_dir,
 ###   out_file <- "chrMT_raw_snps.tab"
 ###   extract_raw_snps_from_RefSNP_json(json_file, out_file, chunksize=1000)
 extract_raw_snps_from_RefSNP_json <- function(con, out="", chunksize=50000,
-                                              assembly="GRCh38.p13",
+                                              assembly="GRCh38.p14",
                                               paranoid=FALSE)
 {
     if (!isSingleNumber(chunksize))

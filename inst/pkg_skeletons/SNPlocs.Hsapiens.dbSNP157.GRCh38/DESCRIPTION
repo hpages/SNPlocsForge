@@ -1,0 +1,30 @@
+Package: SNPlocs.Hsapiens.dbSNP157.GRCh38
+Title: Human SNP locations and alleles extracted from dbSNP Build 157
+        and placed on the GRCh38/hg38 assembly
+Description: The @TOTAL_SNPS@ SNPs in this package were extracted from the
+	RefSNP JSON files for chromosomes 1-22, X, Y, and MT, located at
+	https://ftp.ncbi.nih.gov/snp/archive/b157/JSON/ (these files were
+	created by NCBI in Jan 2025). These SNPs can be "injected" in
+	BSgenome.Hsapiens.NCBI.GRCh38 or BSgenome.Hsapiens.UCSC.hg38.
+	IMPORTANT NOTE: You need a machine with at least 16G of RAM in
+	order to use the SNPlocs.Hsapiens.dbSNP157.GRCh38 package!
+Version: 0.99.24
+Encoding: UTF-8
+Author: Hervé Pagès
+Maintainer: Hervé Pagès <hpages.on.github@gmail.com>
+Depends: R (>= 4.4.0), BSgenome (>= 1.73.1)
+Imports: methods, BiocGenerics, S4Vectors, IRanges, Seqinfo,
+        GenomicRanges, BSgenome
+Suggests: Biostrings, BSgenome.Hsapiens.UCSC.hg38
+SystemRequirements: >= 16G of RAM
+License: Artistic-2.0
+organism: Homo sapiens
+common_name: Human
+provider: dbSNP
+provider_version: dbSNP Human Build 157
+release_date: March 2025
+release_name: dbSNP Human Build 157
+reference_genome: GRCh38.p14
+source_data_url: https://ftp.ncbi.nih.gov/snp/archive/b157/JSON/
+download_date: Oct 6-7, 2025
+biocViews: AnnotationData, Genetics, SNPlocs, Homo_sapiens
