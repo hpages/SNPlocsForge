@@ -6,7 +6,7 @@ Description: The @TOTAL_SNPS@ SNPs in this package were extracted from the
 	https://ftp.ncbi.nih.gov/snp/archive/b157/JSON/ (these files were
 	created by NCBI in Jan 2025). These SNPs can be "injected" in
 	BSgenome.Hsapiens.NCBI.GRCh38 or BSgenome.Hsapiens.UCSC.hg38.
-	IMPORTANT NOTE: You need a machine with at least 16G of RAM in
+	IMPORTANT NOTE: You need a machine with at least 20G of RAM in
 	order to use the SNPlocs.Hsapiens.dbSNP157.GRCh38 package!
 Version: 0.99.24
 Encoding: UTF-8
@@ -16,7 +16,7 @@ Depends: R (>= 4.4.0), BSgenome (>= 1.73.1)
 Imports: methods, BiocGenerics, S4Vectors, IRanges, Seqinfo,
         GenomicRanges, BSgenome
 Suggests: Biostrings, BSgenome.Hsapiens.UCSC.hg38
-SystemRequirements: >= 16G of RAM
+SystemRequirements: >= 20G of RAM
 License: Artistic-2.0
 organism: Homo sapiens
 common_name: Human

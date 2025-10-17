@@ -14,7 +14,7 @@
   Human SNP locations and alleles extracted from dbSNP Build 157 and
   placed on the GRCh37/hg19 assembly.
 
-  IMPORTANT NOTE: You need a machine with at least 16G of RAM in
+  IMPORTANT NOTE: You need a machine with at least 20G of RAM in
   order to use this package!
 }
 
@@ -87,6 +87,14 @@
 }
 
 \examples{
+## IMPORTANT NOTE: After loading the SNPlocs.Hsapiens.dbSNP157.GRCh37
+## package, the first call to any of the snpsBy*() functions will
+## trigger the loading of **all** the rs ids from disk to a cache in
+## memory. Depending on your machine, this can take between 1 and 2
+## minutes. Note that the caching of the rs ids is done only once which
+## means that any subsequent call to a snpsBy*() function will be
+## significantly faster.
+
 ## ---------------------------------------------------------------------
 ## A. BASIC USAGE
 ## ---------------------------------------------------------------------
@@ -109,8 +117,6 @@ my_rsids <- c("rs2639606",  "rs75264089", "rs73396229", "rs55871206",
               "rs10932221", "rs56219727", "rs73709730", "rs55838886",
               "rs3734153",  "rs79381275", "rs1516535",  "rs74342513")
 
-## Note that the first call to snpsById() takes a long time but
-## subsequent calls are faster.
 my_snps <- snpsById(snps, my_rsids)
 my_snps
 

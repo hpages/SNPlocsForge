@@ -8,7 +8,7 @@ To build the **SNPlocs.Hsapiens.dbSNP157.GRCh38** and **SNPlocs.Hsapiens.dbSNP15
 
 4. Run scripts `build_GRCh38_OnDiskLongTable.sh` and `build_GRCh37_OnDiskLongTable.sh` (can be run simultaneously).
 
-5. Edit files `DESCRIPTION` and `man/package.Rd` in newly forged packages by replacing placeholders `@TOTAL_SNPS@` (found) and `@NB_OF_SNP_LOCI_ON_CHR22@` with corresponding values.
+5. Edit files `DESCRIPTION` and `man/package.Rd` in newly forged packages by replacing placeholders `@TOTAL_SNPS@` (found in `DESCRIPTION` _and_ `man/package.Rd`) and `@NB_OF_SNP_LOCI_ON_CHR22@` (found in `man/package.Rd`) with corresponding values.
 
 See comment at the beginning of each shell script for the details of how to run them.
 
